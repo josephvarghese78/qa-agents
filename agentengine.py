@@ -16,7 +16,7 @@ GITHUB_TOKEN = ae.get_token()
 
 
 
-async def ask_copilot_with_attachments(prompt: str, attachments, model: str = "gpt-5") -> str:
+async def ask_copilot_with_attachments(prompt, attachments, model = None) -> str:
     """
     Reusable engine that accepts a prompt and a list of file attachments,
     parses them into context, and returns the Copilot response using the SDK.
@@ -34,18 +34,24 @@ async def ask_copilot_with_attachments(prompt: str, attachments, model: str = "g
 
     # 3. Spin up the Copilot SDK Client and Session via async context managers
     async with CopilotClient() as client:
-        async with await client.create_session(
-                on_permission_request=PermissionHandler.approve_all,
-            model=model,
-                system_message={
-    "content": """
-    You are a text-only assistant. 
-    Never attempt to use tools to write files, or modify files, 
-    but you can read and analyze the content of attached files to answer questions and generate outputs.
-    Return all generated content directly in the response.
-    """},
-                github_token=GITHUB_TOKEN
-                            ) as session:
+        session_args = {
+        "on_permission_request":PermissionHandler.approve_all,
+        "system_message":{
+            "content": """
+                    You are a text-only assistant. 
+                    Never attempt to use tools to write files, or modify files, 
+                    but you can read and analyze the content of attached files to answer questions and generate outputs.
+                    Return all generated content directly in the response.
+            """
+        },
+        "github_token":GITHUB_TOKEN
+        }
+
+        if model:
+            session_args["model"] = model
+
+
+        async with await client.create_session(**session_args) as session:
 
             # Setup an event handler to collect stream outputs
             done = asyncio.Event()
