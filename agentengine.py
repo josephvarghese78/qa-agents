@@ -10,21 +10,22 @@ from copilot.session_events import (
     ToolExecutionStartData,
     SessionIdleData
 )
+import authorize as ae
 
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = ae.get_token()
 
 
 
-async def ask_copilot_with_attachments(prompt: str, attachments: str = None, model: str = "gpt-5") -> str:
+async def ask_copilot_with_attachments(prompt: str, attachments, model: str = "gpt-5") -> str:
     """
     Reusable engine that accepts a prompt and a list of file attachments,
     parses them into context, and returns the Copilot response using the SDK.
     """
 
     # 2. Construct the final comprehensive payload
-    final_prompt = prompt
-    if attachments:
-        final_prompt = f"Context from attachments:\n{attachments}\n\nUser Question:\n{prompt}"
+    #final_prompt = prompt
+    #if attachments:
+    #    final_prompt = f"Context from attachments:\n{attachments}\n\nUser Question:\n{prompt}"
 
     response_content = []
 
@@ -35,11 +36,12 @@ async def ask_copilot_with_attachments(prompt: str, attachments: str = None, mod
     async with CopilotClient() as client:
         async with await client.create_session(
                 on_permission_request=PermissionHandler.approve_all,
+            model=model,
                 system_message={
     "content": """
     You are a text-only assistant. 
-    Never attempt to use tools, 
-    write files, or modify files.
+    Never attempt to use tools to write files, or modify files, 
+    but you can read and analyze the content of attached files to answer questions and generate outputs.
     Return all generated content directly in the response.
     """},
                 github_token=GITHUB_TOKEN
@@ -50,7 +52,7 @@ async def ask_copilot_with_attachments(prompt: str, attachments: str = None, mod
 
             def on_event(event):
                 # Check for incoming assistant message variations based on SDK spec
-                #print(event)
+                print(event)
                 if isinstance(event.data, AssistantMessageData):
                     content = getattr(event.data, "content", "")
                     if content:
@@ -64,7 +66,10 @@ async def ask_copilot_with_attachments(prompt: str, attachments: str = None, mod
             session.on(on_event)
 
             # Send prompt down the pipeline
-            await session.send(final_prompt)
+            if attachments:
+                await session.send(prompt, attachments=attachments)
+            else:
+                await session.send(prompt)
 
             # Keep execution block open until the model stops streaming
             await done.wait()

@@ -1,0 +1,1084 @@
+[
+  {
+    "test_id": "TC-001",
+    "test_name": "Verify successful user login with valid credentials",
+    "test_description": "Validate that a registered Moogsoft user can successfully authenticate into the platform using valid username and password and is redirected to the default dashboard view as defined in the BRD.",
+    "preconditions": "User account exists in Moogsoft with active status and assigned role.",
+    "Expected Result": "User is authenticated, session token is issued, and the Situation Room/Dashboard is displayed.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Navigate to the Moogsoft login URL",
+      "Step 2: Enter a valid username",
+      "Step 3: Enter the corresponding valid password",
+      "Step 4: Click the Login button",
+      "Step 5: Verify redirection to the default landing dashboard"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-002",
+    "test_name": "Verify login failure with invalid password",
+    "test_description": "Ensure that the system rejects authentication attempts with a valid username but invalid password and displays an appropriate error message without exposing sensitive information.",
+    "preconditions": "Valid user exists in the system.",
+    "Expected Result": "Login is rejected with a generic error message such as 'Invalid username or password'. No session is created.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Negative",
+    "steps": [
+      "Step 1: Open login page",
+      "Step 2: Enter valid username",
+      "Step 3: Enter an incorrect password",
+      "Step 4: Click Login",
+      "Step 5: Verify generic authentication error is displayed"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-003",
+    "test_name": "Verify account lockout after consecutive failed login attempts",
+    "test_description": "Validate that after the configured threshold of failed login attempts, the user account is temporarily locked to mitigate brute-force attacks.",
+    "preconditions": "Account lockout policy is configured (e.g., 5 attempts).",
+    "Expected Result": "After exceeding the threshold, the account is locked and subsequent attempts display a lockout message.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Security",
+    "steps": [
+      "Step 1: Attempt login with wrong password N times consecutively",
+      "Step 2: On the N+1 attempt, observe the response",
+      "Step 3: Verify account lockout message",
+      "Step 4: Verify even correct password is rejected until unlock"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-004",
+    "test_name": "Verify SSO/SAML authentication integration",
+    "test_description": "Validate that users configured for SSO can authenticate through the configured Identity Provider and are provisioned into Moogsoft with correct role mapping.",
+    "preconditions": "SSO/SAML IdP is configured and user exists in IdP.",
+    "Expected Result": "User is redirected to IdP, authenticated, redirected back, and granted role-appropriate access.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Access Moogsoft login URL",
+      "Step 2: Select SSO login option",
+      "Step 3: Authenticate via IdP",
+      "Step 4: Verify SAML assertion is consumed",
+      "Step 5: Verify role and permissions match IdP attributes"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-005",
+    "test_name": "Verify event ingestion via REST API LAM",
+    "test_description": "Validate that events posted via the REST LAM endpoint are accepted, parsed, and converted into Moogsoft events visible in the Open Events view.",
+    "preconditions": "REST LAM is configured, running, and authentication token is available.",
+    "Expected Result": "HTTP 200 response returned and event appears in Open Events with correctly mapped fields (source, severity, description, manager).",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Construct a valid event payload in JSON",
+      "Step 2: POST payload to the REST LAM endpoint with auth header",
+      "Step 3: Verify HTTP 200 success response",
+      "Step 4: Open Events view and search for ingested event",
+      "Step 5: Validate field mappings"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-006",
+    "test_name": "Verify event ingestion rejects malformed payload",
+    "test_description": "Ensure that the LAM returns an appropriate error and does not create an event when the payload is malformed or missing required fields.",
+    "preconditions": "REST LAM is running.",
+    "Expected Result": "HTTP 400 response with descriptive error; no event created in Moogsoft.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Negative",
+    "steps": [
+      "Step 1: Send POST request with invalid JSON",
+      "Step 2: Verify 400 Bad Request response",
+      "Step 3: Send valid JSON missing required field 'signature'",
+      "Step 4: Verify rejection with field-level error",
+      "Step 5: Confirm no event exists in Open Events"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-007",
+    "test_name": "Verify event deduplication via signature",
+    "test_description": "Validate that incoming events sharing the same signature are deduplicated and the existing event's count is incremented instead of creating duplicates.",
+    "preconditions": "An event with signature S exists in Open Events.",
+    "Expected Result": "Subsequent events with signature S do not create new event rows; the original event's count/last-occurrence timestamp updates.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Send event with signature S",
+      "Step 2: Send identical event again",
+      "Step 3: Open Open Events view",
+      "Step 4: Verify only one row exists for signature S",
+      "Step 5: Verify count incremented and last-occurrence updated"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-008",
+    "test_name": "Verify alert clustering into Situations by algorithm",
+    "test_description": "Validate that correlated alerts are clustered into a Situation by the configured clustering algorithm (e.g., Cookbook, Tempus, Classic).",
+    "preconditions": "Clustering algorithm is configured; multiple correlated alerts ingested within the time window.",
+    "Expected Result": "A Situation is created containing the correlated alerts with correct description, severity, and assigned moderator.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Ingest a set of correlated alerts",
+      "Step 2: Wait for the clustering interval",
+      "Step 3: Open Situation Room",
+      "Step 4: Verify Situation is created with expected alerts",
+      "Step 5: Validate severity is highest of contained alerts"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-009",
+    "test_name": "Verify Situation severity escalation when higher severity alert added",
+    "test_description": "Ensure a Situation's severity escalates automatically when a newly clustered alert has higher severity than current Situation severity.",
+    "preconditions": "Open Situation exists with severity 'Minor'.",
+    "Expected Result": "Situation severity updates to 'Critical' when a Critical alert joins the cluster.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Identify open Situation with Minor severity",
+      "Step 2: Ingest a correlated Critical alert",
+      "Step 3: Verify alert is added to Situation",
+      "Step 4: Verify Situation severity updates to Critical",
+      "Step 5: Verify audit log records the change"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-010",
+    "test_name": "Verify Situation assignment to moderator/team",
+    "test_description": "Validate that Situations can be assigned to a moderator or team and ownership is reflected across UI and notifications.",
+    "preconditions": "Open Situation exists; user has assignment permission.",
+    "Expected Result": "Situation owner is updated, notifications are sent, and assignment is visible in audit log.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Open a Situation",
+      "Step 2: Click Assign and select moderator",
+      "Step 3: Confirm assignment",
+      "Step 4: Verify owner displayed in Situation header",
+      "Step 5: Verify assignee receives notification"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-011",
+    "test_name": "Verify Situation closure workflow",
+    "test_description": "Validate the full lifecycle closure of a Situation including resolution notes, status update, and downstream notifications.",
+    "preconditions": "An open Situation is assigned to the current user.",
+    "Expected Result": "Situation transitions to Closed/Resolved status, resolution is captured, and contained alerts are also resolved per policy.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Open assigned Situation",
+      "Step 2: Click Resolve",
+      "Step 3: Enter resolution notes",
+      "Step 4: Submit closure",
+      "Step 5: Verify status, audit trail, and downstream ticket update"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-012",
+    "test_name": "Verify role-based access control for Operator role",
+    "test_description": "Validate that users with Operator role can view and acknowledge Situations but cannot perform admin functions such as user management or integration configuration.",
+    "preconditions": "Operator user exists.",
+    "Expected Result": "Operator-allowed actions succeed; restricted admin actions are hidden or return authorization errors.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Security",
+    "steps": [
+      "Step 1: Login as Operator",
+      "Step 2: Acknowledge a Situation",
+      "Step 3: Attempt to access user management page",
+      "Step 4: Verify access denied",
+      "Step 5: Attempt to modify integration; verify denial"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-013",
+    "test_name": "Verify ServiceNow integration creates incident from Situation",
+    "test_description": "Validate the bi-directional ServiceNow integration creates a corresponding incident when a Situation is escalated and links its number back to Moogsoft.",
+    "preconditions": "ServiceNow integration is configured with valid credentials and instance URL.",
+    "Expected Result": "Incident is created in ServiceNow with mapped fields; SN incident number appears on the Moogsoft Situation.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Open a Situation",
+      "Step 2: Click 'Create ServiceNow Incident'",
+      "Step 3: Verify incident appears in ServiceNow",
+      "Step 4: Verify SN incident number recorded on Situation",
+      "Step 5: Update SN incident and verify status sync back to Moogsoft"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-014",
+    "test_name": "Verify email notification sent on Situation creation",
+    "test_description": "Ensure email notification is dispatched to configured recipients when a new Situation is created based on notification policy.",
+    "preconditions": "Email integration configured; notification policy defined.",
+    "Expected Result": "Email is delivered with Situation summary, severity, ID, and deep link.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Trigger creation of a new Situation",
+      "Step 2: Wait for notification trigger",
+      "Step 3: Check recipient inbox",
+      "Step 4: Validate email content and link"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-015",
+    "test_name": "Verify maintenance window suppresses alerts",
+    "test_description": "Validate that alerts received during a configured maintenance window for a host/service are suppressed and not promoted to Situations.",
+    "preconditions": "Maintenance window scheduled for host H covering current time.",
+    "Expected Result": "Alerts for host H are suppressed with status 'maintenance' and do not generate Situations.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Configure maintenance window for host H",
+      "Step 2: Ingest alert for host H during window",
+      "Step 3: Verify alert is suppressed",
+      "Step 4: Verify no Situation is created",
+      "Step 5: End window and verify subsequent alerts process normally"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-016",
+    "test_name": "Verify enrichment rules add CMDB data to alerts",
+    "test_description": "Validate that enrichment rules pulling data from CMDB add owner, location, and business service attributes to incoming alerts.",
+    "preconditions": "CMDB integration configured; enrichment rule active.",
+    "Expected Result": "Ingested alert contains enriched fields populated from CMDB lookup.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Ingest alert for CI present in CMDB",
+      "Step 2: Open alert details",
+      "Step 3: Verify enriched fields populated",
+      "Step 4: Ingest alert for unknown CI",
+      "Step 5: Verify enrichment gracefully skipped"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-017",
+    "test_name": "Verify maximum event payload size handling",
+    "test_description": "Validate behavior when payload exceeds configured maximum size limit at LAM ingestion.",
+    "preconditions": "Configured max payload size known.",
+    "Expected Result": "Oversized payload is rejected with HTTP 413; system remains stable; valid sized payload immediately after is processed.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Edge",
+    "steps": [
+      "Step 1: Construct payload exceeding limit",
+      "Step 2: POST to LAM",
+      "Step 3: Verify 413 response",
+      "Step 4: Send valid payload",
+      "Step 5: Verify successful processing"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-018",
+    "test_name": "Verify high-volume event ingestion throughput",
+    "test_description": "Validate the system sustains the documented events-per-second throughput without dropping events or degrading UI responsiveness.",
+    "preconditions": "Performance test environment provisioned per BRD sizing.",
+    "Expected Result": "All ingested events accounted for; latency within SLO; no LAM crashes.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Edge",
+    "steps": [
+      "Step 1: Start event generator at target EPS",
+      "Step 2: Run sustained load for 30 minutes",
+      "Step 3: Monitor LAM and processor metrics",
+      "Step 4: Reconcile sent vs. received counts",
+      "Step 5: Verify Situation Room remains responsive"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-019",
+    "test_name": "Verify field validation for required event attributes",
+    "test_description": "Ensure events missing mandatory attributes (signature, source, severity) are rejected with field-specific errors.",
+    "preconditions": "LAM running.",
+    "Expected Result": "Each missing required field generates a clear validation error and the event is not stored.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Validation",
+    "steps": [
+      "Step 1: Send payload missing 'signature'",
+      "Step 2: Send payload missing 'severity'",
+      "Step 3: Send payload missing 'source'",
+      "Step 4: Verify each is rejected with proper error"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-020",
+    "test_name": "Verify severity boundary values are accepted",
+    "test_description": "Validate severities at boundary values (0=Clear and 5=Critical) are properly accepted and mapped.",
+    "preconditions": "LAM accepting events.",
+    "Expected Result": "Events with severity 0 and 5 are stored with correct severity labels; out-of-range severities (-1, 6) are rejected.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Edge",
+    "steps": [
+      "Step 1: Send event with severity 0",
+      "Step 2: Send event with severity 5",
+      "Step 3: Send event with severity -1",
+      "Step 4: Send event with severity 6",
+      "Step 5: Verify acceptance/rejection accordingly"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-021",
+    "test_name": "Verify Clear severity auto-resolves matching alerts",
+    "test_description": "Validate that a Clear event auto-resolves matching active alerts based on signature.",
+    "preconditions": "Active alert with signature S exists.",
+    "Expected Result": "On receipt of Clear event matching signature S, the alert is resolved and any Situation reviewed for closure.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Confirm active alert with signature S",
+      "Step 2: Send Clear event for signature S",
+      "Step 3: Verify alert is resolved",
+      "Step 4: Verify Situation updated if all contained alerts cleared"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-022",
+    "test_name": "Verify audit log captures user actions",
+    "test_description": "Ensure all critical user actions (login, assignment, closure, configuration change) are written to the immutable audit log.",
+    "preconditions": "Audit logging enabled.",
+    "Expected Result": "Each action produces an audit entry with user, timestamp, action, and target object.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Security",
+    "steps": [
+      "Step 1: Perform login",
+      "Step 2: Assign and resolve a Situation",
+      "Step 3: Modify a configuration",
+      "Step 4: Query the audit log",
+      "Step 5: Verify entries exist with correct attribution"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-023",
+    "test_name": "Verify session timeout after inactivity",
+    "test_description": "Validate that user sessions expire after the configured inactivity period and re-authentication is required.",
+    "preconditions": "Session timeout policy configured (e.g., 30 minutes).",
+    "Expected Result": "After inactivity period, user is logged out and redirected to login.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Security",
+    "steps": [
+      "Step 1: Login and remain idle past timeout",
+      "Step 2: Attempt an action",
+      "Step 3: Verify redirection to login",
+      "Step 4: Verify re-authentication required"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-024",
+    "test_name": "Verify API rate limiting enforcement",
+    "test_description": "Validate that API rate limits return 429 when exceeded and reset after the window.",
+    "preconditions": "Rate limit configured per token.",
+    "Expected Result": "Requests beyond the limit return HTTP 429; subsequent requests succeed after window reset.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Security",
+    "steps": [
+      "Step 1: Send burst exceeding rate limit",
+      "Step 2: Verify 429 responses",
+      "Step 3: Wait for window reset",
+      "Step 4: Send request and verify success"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-025",
+    "test_name": "Verify database failover continuity",
+    "test_description": "Validate that the platform continues operating with minimal data loss during database primary failover.",
+    "preconditions": "HA database cluster configured.",
+    "Expected Result": "Ingestion continues with brief degradation; no committed events lost; UI recovers automatically.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Begin steady-state event ingestion",
+      "Step 2: Trigger DB primary failover",
+      "Step 3: Monitor ingestion and UI",
+      "Step 4: Reconcile pre/post counts",
+      "Step 5: Verify no committed data lost"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-026",
+    "test_name": "Verify export of Situation report to CSV",
+    "test_description": "Validate that users can export filtered Situation data to CSV with all visible columns.",
+    "preconditions": "User has reporting permission; Situations exist.",
+    "Expected Result": "CSV file downloads with correct rows matching filter and all selected columns.",
+    "image_ref": "no",
+    "priority": "Low",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Apply filter on Situations view",
+      "Step 2: Click Export to CSV",
+      "Step 3: Open the file",
+      "Step 4: Verify row count and column completeness"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-027",
+    "test_name": "Verify SQL injection protection on search inputs",
+    "test_description": "Ensure search and filter fields are protected against SQL injection attempts.",
+    "preconditions": "User has access to search UI.",
+    "Expected Result": "Injection payloads are sanitized/escaped; no errors, no unauthorized data exposure.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Security",
+    "steps": [
+      "Step 1: Enter SQL injection payload in search",
+      "Step 2: Submit search",
+      "Step 3: Verify safe handling and normal empty/result response",
+      "Step 4: Verify no DB error in logs"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-028",
+    "test_name": "Verify XSS protection in alert/situation description fields",
+    "test_description": "Ensure script payloads sent in event description are escaped when rendered in UI.",
+    "preconditions": "User can ingest events.",
+    "Expected Result": "Script tags are rendered as text, not executed; CSP headers present.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Security",
+    "steps": [
+      "Step 1: Ingest event with description containing <script>alert(1)</script>",
+      "Step 2: Open Open Events view",
+      "Step 3: Verify content rendered safely",
+      "Step 4: Verify no JS execution"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-029",
+    "test_name": "Verify Slack/Teams collaboration channel auto-creation",
+    "test_description": "Validate that when a Situation is created, the configured collaboration channel (Slack/Teams) is auto-provisioned and members are invited.",
+    "preconditions": "Slack/Teams integration enabled; channel template configured.",
+    "Expected Result": "Channel is created with naming convention, invited stakeholders, and initial Situation summary posted.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Trigger creation of new Situation",
+      "Step 2: Verify channel created in Slack/Teams",
+      "Step 3: Verify members invited",
+      "Step 4: Verify initial post contains Situation details and link"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-030",
+    "test_name": "Verify retention policy purges aged data",
+    "test_description": "Validate that events, alerts, and Situations older than configured retention period are purged or archived.",
+    "preconditions": "Retention policy configured (e.g., 90 days).",
+    "Expected Result": "Data older than retention threshold is removed/archived; UI and queries do not return purged records.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Identify records older than retention",
+      "Step 2: Trigger or wait for retention job",
+      "Step 3: Verify purge/archive completion",
+      "Step 4: Query for old records and verify absence"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "OPEN-QUESTIONS",
+    "test_name": "Open Questions for Clarification",
+    "test_description": "The attached document 'Moogsoft BRD v4.1.3.docx' was referenced but its textual content was not accessible in this text-only mode. Test cases above are derived from standard Moogsoft AIOps platform capabilities and general BRD patterns. Confirm: (1) exact clustering algorithm and thresholds, (2) configured severity scale and field mappings, (3) RBAC matrix and role names, (4) enabled integrations (ServiceNow, Slack/Teams, email, SSO IdP), (5) retention/archival periods, (6) performance SLOs and target EPS, (7) maintenance window scope rules, (8) notification policy specifics, (9) audit log fields, (10) any custom enrichment/CMDB sources.",
+    "preconditions": "N/A",
+    "Expected Result": "N/A",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-001",
+    "test_name": "Verify successful user login with valid credentials",
+    "test_description": "Validate that a registered Moogsoft user can successfully authenticate into the platform using valid username and password and is redirected to the default dashboard view as defined in the BRD.",
+    "preconditions": "User account exists in Moogsoft with active status and assigned role.",
+    "Expected Result": "User is authenticated, session token is issued, and the Situation Room/Dashboard is displayed.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Navigate to the Moogsoft login URL",
+      "Step 2: Enter a valid username",
+      "Step 3: Enter the corresponding valid password",
+      "Step 4: Click the Login button",
+      "Step 5: Verify redirection to the default landing dashboard"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-002",
+    "test_name": "Verify login failure with invalid password",
+    "test_description": "Ensure that the system rejects authentication attempts with a valid username but invalid password and displays an appropriate error message without exposing sensitive information.",
+    "preconditions": "Valid user exists in the system.",
+    "Expected Result": "Login is rejected with a generic error message such as 'Invalid username or password'. No session is created.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Negative",
+    "steps": [
+      "Step 1: Open login page",
+      "Step 2: Enter valid username",
+      "Step 3: Enter an incorrect password",
+      "Step 4: Click Login",
+      "Step 5: Verify generic authentication error is displayed"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-003",
+    "test_name": "Verify account lockout after consecutive failed login attempts",
+    "test_description": "Validate that after the configured threshold of failed login attempts, the user account is temporarily locked to mitigate brute-force attacks.",
+    "preconditions": "Account lockout policy is configured (e.g., 5 attempts).",
+    "Expected Result": "After exceeding the threshold, the account is locked and subsequent attempts display a lockout message.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Security",
+    "steps": [
+      "Step 1: Attempt login with wrong password N times consecutively",
+      "Step 2: On the N+1 attempt, observe the response",
+      "Step 3: Verify account lockout message",
+      "Step 4: Verify even correct password is rejected until unlock"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-004",
+    "test_name": "Verify SSO/SAML authentication integration",
+    "test_description": "Validate that users configured for SSO can authenticate through the configured Identity Provider and are provisioned into Moogsoft with correct role mapping.",
+    "preconditions": "SSO/SAML IdP is configured and user exists in IdP.",
+    "Expected Result": "User is redirected to IdP, authenticated, redirected back, and granted role-appropriate access.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Access Moogsoft login URL",
+      "Step 2: Select SSO login option",
+      "Step 3: Authenticate via IdP",
+      "Step 4: Verify SAML assertion is consumed",
+      "Step 5: Verify role and permissions match IdP attributes"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-005",
+    "test_name": "Verify event ingestion via REST API LAM",
+    "test_description": "Validate that events posted via the REST LAM endpoint are accepted, parsed, and converted into Moogsoft events visible in the Open Events view.",
+    "preconditions": "REST LAM is configured, running, and authentication token is available.",
+    "Expected Result": "HTTP 200 response returned and event appears in Open Events with correctly mapped fields (source, severity, description, manager).",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Construct a valid event payload in JSON",
+      "Step 2: POST payload to the REST LAM endpoint with auth header",
+      "Step 3: Verify HTTP 200 success response",
+      "Step 4: Open Events view and search for ingested event",
+      "Step 5: Validate field mappings"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-006",
+    "test_name": "Verify event ingestion rejects malformed payload",
+    "test_description": "Ensure that the LAM returns an appropriate error and does not create an event when the payload is malformed or missing required fields.",
+    "preconditions": "REST LAM is running.",
+    "Expected Result": "HTTP 400 response with descriptive error; no event created in Moogsoft.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Negative",
+    "steps": [
+      "Step 1: Send POST request with invalid JSON",
+      "Step 2: Verify 400 Bad Request response",
+      "Step 3: Send valid JSON missing required field 'signature'",
+      "Step 4: Verify rejection with field-level error",
+      "Step 5: Confirm no event exists in Open Events"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-007",
+    "test_name": "Verify event deduplication via signature",
+    "test_description": "Validate that incoming events sharing the same signature are deduplicated and the existing event's count is incremented instead of creating duplicates.",
+    "preconditions": "An event with signature S exists in Open Events.",
+    "Expected Result": "Subsequent events with signature S do not create new event rows; the original event's count/last-occurrence timestamp updates.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Send event with signature S",
+      "Step 2: Send identical event again",
+      "Step 3: Open Open Events view",
+      "Step 4: Verify only one row exists for signature S",
+      "Step 5: Verify count incremented and last-occurrence updated"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-008",
+    "test_name": "Verify alert clustering into Situations by algorithm",
+    "test_description": "Validate that correlated alerts are clustered into a Situation by the configured clustering algorithm (e.g., Cookbook, Tempus, Classic).",
+    "preconditions": "Clustering algorithm is configured; multiple correlated alerts ingested within the time window.",
+    "Expected Result": "A Situation is created containing the correlated alerts with correct description, severity, and assigned moderator.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Ingest a set of correlated alerts",
+      "Step 2: Wait for the clustering interval",
+      "Step 3: Open Situation Room",
+      "Step 4: Verify Situation is created with expected alerts",
+      "Step 5: Validate severity is highest of contained alerts"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-009",
+    "test_name": "Verify Situation severity escalation when higher severity alert added",
+    "test_description": "Ensure a Situation's severity escalates automatically when a newly clustered alert has higher severity than current Situation severity.",
+    "preconditions": "Open Situation exists with severity 'Minor'.",
+    "Expected Result": "Situation severity updates to 'Critical' when a Critical alert joins the cluster.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Identify open Situation with Minor severity",
+      "Step 2: Ingest a correlated Critical alert",
+      "Step 3: Verify alert is added to Situation",
+      "Step 4: Verify Situation severity updates to Critical",
+      "Step 5: Verify audit log records the change"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-010",
+    "test_name": "Verify Situation assignment to moderator/team",
+    "test_description": "Validate that Situations can be assigned to a moderator or team and ownership is reflected across UI and notifications.",
+    "preconditions": "Open Situation exists; user has assignment permission.",
+    "Expected Result": "Situation owner is updated, notifications are sent, and assignment is visible in audit log.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Open a Situation",
+      "Step 2: Click Assign and select moderator",
+      "Step 3: Confirm assignment",
+      "Step 4: Verify owner displayed in Situation header",
+      "Step 5: Verify assignee receives notification"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-011",
+    "test_name": "Verify Situation closure workflow",
+    "test_description": "Validate the full lifecycle closure of a Situation including resolution notes, status update, and downstream notifications.",
+    "preconditions": "An open Situation is assigned to the current user.",
+    "Expected Result": "Situation transitions to Closed/Resolved status, resolution is captured, and contained alerts are also resolved per policy.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Open assigned Situation",
+      "Step 2: Click Resolve",
+      "Step 3: Enter resolution notes",
+      "Step 4: Submit closure",
+      "Step 5: Verify status, audit trail, and downstream ticket update"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-012",
+    "test_name": "Verify role-based access control for Operator role",
+    "test_description": "Validate that users with Operator role can view and acknowledge Situations but cannot perform admin functions such as user management or integration configuration.",
+    "preconditions": "Operator user exists.",
+    "Expected Result": "Operator-allowed actions succeed; restricted admin actions are hidden or return authorization errors.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Security",
+    "steps": [
+      "Step 1: Login as Operator",
+      "Step 2: Acknowledge a Situation",
+      "Step 3: Attempt to access user management page",
+      "Step 4: Verify access denied",
+      "Step 5: Attempt to modify integration; verify denial"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-013",
+    "test_name": "Verify ServiceNow integration creates incident from Situation",
+    "test_description": "Validate the bi-directional ServiceNow integration creates a corresponding incident when a Situation is escalated and links its number back to Moogsoft.",
+    "preconditions": "ServiceNow integration is configured with valid credentials and instance URL.",
+    "Expected Result": "Incident is created in ServiceNow with mapped fields; SN incident number appears on the Moogsoft Situation.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Open a Situation",
+      "Step 2: Click 'Create ServiceNow Incident'",
+      "Step 3: Verify incident appears in ServiceNow",
+      "Step 4: Verify SN incident number recorded on Situation",
+      "Step 5: Update SN incident and verify status sync back to Moogsoft"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-014",
+    "test_name": "Verify email notification sent on Situation creation",
+    "test_description": "Ensure email notification is dispatched to configured recipients when a new Situation is created based on notification policy.",
+    "preconditions": "Email integration configured; notification policy defined.",
+    "Expected Result": "Email is delivered with Situation summary, severity, ID, and deep link.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Trigger creation of a new Situation",
+      "Step 2: Wait for notification trigger",
+      "Step 3: Check recipient inbox",
+      "Step 4: Validate email content and link"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-015",
+    "test_name": "Verify maintenance window suppresses alerts",
+    "test_description": "Validate that alerts received during a configured maintenance window for a host/service are suppressed and not promoted to Situations.",
+    "preconditions": "Maintenance window scheduled for host H covering current time.",
+    "Expected Result": "Alerts for host H are suppressed with status 'maintenance' and do not generate Situations.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Configure maintenance window for host H",
+      "Step 2: Ingest alert for host H during window",
+      "Step 3: Verify alert is suppressed",
+      "Step 4: Verify no Situation is created",
+      "Step 5: End window and verify subsequent alerts process normally"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-016",
+    "test_name": "Verify enrichment rules add CMDB data to alerts",
+    "test_description": "Validate that enrichment rules pulling data from CMDB add owner, location, and business service attributes to incoming alerts.",
+    "preconditions": "CMDB integration configured; enrichment rule active.",
+    "Expected Result": "Ingested alert contains enriched fields populated from CMDB lookup.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Ingest alert for CI present in CMDB",
+      "Step 2: Open alert details",
+      "Step 3: Verify enriched fields populated",
+      "Step 4: Ingest alert for unknown CI",
+      "Step 5: Verify enrichment gracefully skipped"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-017",
+    "test_name": "Verify maximum event payload size handling",
+    "test_description": "Validate behavior when payload exceeds configured maximum size limit at LAM ingestion.",
+    "preconditions": "Configured max payload size known.",
+    "Expected Result": "Oversized payload is rejected with HTTP 413; system remains stable; valid sized payload immediately after is processed.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Edge",
+    "steps": [
+      "Step 1: Construct payload exceeding limit",
+      "Step 2: POST to LAM",
+      "Step 3: Verify 413 response",
+      "Step 4: Send valid payload",
+      "Step 5: Verify successful processing"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-018",
+    "test_name": "Verify high-volume event ingestion throughput",
+    "test_description": "Validate the system sustains the documented events-per-second throughput without dropping events or degrading UI responsiveness.",
+    "preconditions": "Performance test environment provisioned per BRD sizing.",
+    "Expected Result": "All ingested events accounted for; latency within SLO; no LAM crashes.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Edge",
+    "steps": [
+      "Step 1: Start event generator at target EPS",
+      "Step 2: Run sustained load for 30 minutes",
+      "Step 3: Monitor LAM and processor metrics",
+      "Step 4: Reconcile sent vs. received counts",
+      "Step 5: Verify Situation Room remains responsive"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-019",
+    "test_name": "Verify field validation for required event attributes",
+    "test_description": "Ensure events missing mandatory attributes (signature, source, severity) are rejected with field-specific errors.",
+    "preconditions": "LAM running.",
+    "Expected Result": "Each missing required field generates a clear validation error and the event is not stored.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Validation",
+    "steps": [
+      "Step 1: Send payload missing 'signature'",
+      "Step 2: Send payload missing 'severity'",
+      "Step 3: Send payload missing 'source'",
+      "Step 4: Verify each is rejected with proper error"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-020",
+    "test_name": "Verify severity boundary values are accepted",
+    "test_description": "Validate severities at boundary values (0=Clear and 5=Critical) are properly accepted and mapped.",
+    "preconditions": "LAM accepting events.",
+    "Expected Result": "Events with severity 0 and 5 are stored with correct severity labels; out-of-range severities (-1, 6) are rejected.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Edge",
+    "steps": [
+      "Step 1: Send event with severity 0",
+      "Step 2: Send event with severity 5",
+      "Step 3: Send event with severity -1",
+      "Step 4: Send event with severity 6",
+      "Step 5: Verify acceptance/rejection accordingly"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-021",
+    "test_name": "Verify Clear severity auto-resolves matching alerts",
+    "test_description": "Validate that a Clear event auto-resolves matching active alerts based on signature.",
+    "preconditions": "Active alert with signature S exists.",
+    "Expected Result": "On receipt of Clear event matching signature S, the alert is resolved and any Situation reviewed for closure.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Confirm active alert with signature S",
+      "Step 2: Send Clear event for signature S",
+      "Step 3: Verify alert is resolved",
+      "Step 4: Verify Situation updated if all contained alerts cleared"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-022",
+    "test_name": "Verify audit log captures user actions",
+    "test_description": "Ensure all critical user actions (login, assignment, closure, configuration change) are written to the immutable audit log.",
+    "preconditions": "Audit logging enabled.",
+    "Expected Result": "Each action produces an audit entry with user, timestamp, action, and target object.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Security",
+    "steps": [
+      "Step 1: Perform login",
+      "Step 2: Assign and resolve a Situation",
+      "Step 3: Modify a configuration",
+      "Step 4: Query the audit log",
+      "Step 5: Verify entries exist with correct attribution"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-023",
+    "test_name": "Verify session timeout after inactivity",
+    "test_description": "Validate that user sessions expire after the configured inactivity period and re-authentication is required.",
+    "preconditions": "Session timeout policy configured (e.g., 30 minutes).",
+    "Expected Result": "After inactivity period, user is logged out and redirected to login.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Security",
+    "steps": [
+      "Step 1: Login and remain idle past timeout",
+      "Step 2: Attempt an action",
+      "Step 3: Verify redirection to login",
+      "Step 4: Verify re-authentication required"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-024",
+    "test_name": "Verify API rate limiting enforcement",
+    "test_description": "Validate that API rate limits return 429 when exceeded and reset after the window.",
+    "preconditions": "Rate limit configured per token.",
+    "Expected Result": "Requests beyond the limit return HTTP 429; subsequent requests succeed after window reset.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Security",
+    "steps": [
+      "Step 1: Send burst exceeding rate limit",
+      "Step 2: Verify 429 responses",
+      "Step 3: Wait for window reset",
+      "Step 4: Send request and verify success"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-025",
+    "test_name": "Verify database failover continuity",
+    "test_description": "Validate that the platform continues operating with minimal data loss during database primary failover.",
+    "preconditions": "HA database cluster configured.",
+    "Expected Result": "Ingestion continues with brief degradation; no committed events lost; UI recovers automatically.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Begin steady-state event ingestion",
+      "Step 2: Trigger DB primary failover",
+      "Step 3: Monitor ingestion and UI",
+      "Step 4: Reconcile pre/post counts",
+      "Step 5: Verify no committed data lost"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-026",
+    "test_name": "Verify export of Situation report to CSV",
+    "test_description": "Validate that users can export filtered Situation data to CSV with all visible columns.",
+    "preconditions": "User has reporting permission; Situations exist.",
+    "Expected Result": "CSV file downloads with correct rows matching filter and all selected columns.",
+    "image_ref": "no",
+    "priority": "Low",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Apply filter on Situations view",
+      "Step 2: Click Export to CSV",
+      "Step 3: Open the file",
+      "Step 4: Verify row count and column completeness"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-027",
+    "test_name": "Verify SQL injection protection on search inputs",
+    "test_description": "Ensure search and filter fields are protected against SQL injection attempts.",
+    "preconditions": "User has access to search UI.",
+    "Expected Result": "Injection payloads are sanitized/escaped; no errors, no unauthorized data exposure.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Security",
+    "steps": [
+      "Step 1: Enter SQL injection payload in search",
+      "Step 2: Submit search",
+      "Step 3: Verify safe handling and normal empty/result response",
+      "Step 4: Verify no DB error in logs"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-028",
+    "test_name": "Verify XSS protection in alert/situation description fields",
+    "test_description": "Ensure script payloads sent in event description are escaped when rendered in UI.",
+    "preconditions": "User can ingest events.",
+    "Expected Result": "Script tags are rendered as text, not executed; CSP headers present.",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Security",
+    "steps": [
+      "Step 1: Ingest event with description containing <script>alert(1)</script>",
+      "Step 2: Open Open Events view",
+      "Step 3: Verify content rendered safely",
+      "Step 4: Verify no JS execution"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-029",
+    "test_name": "Verify Slack/Teams collaboration channel auto-creation",
+    "test_description": "Validate that when a Situation is created, the configured collaboration channel (Slack/Teams) is auto-provisioned and members are invited.",
+    "preconditions": "Slack/Teams integration enabled; channel template configured.",
+    "Expected Result": "Channel is created with naming convention, invited stakeholders, and initial Situation summary posted.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Integration",
+    "steps": [
+      "Step 1: Trigger creation of new Situation",
+      "Step 2: Verify channel created in Slack/Teams",
+      "Step 3: Verify members invited",
+      "Step 4: Verify initial post contains Situation details and link"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "TC-030",
+    "test_name": "Verify retention policy purges aged data",
+    "test_description": "Validate that events, alerts, and Situations older than configured retention period are purged or archived.",
+    "preconditions": "Retention policy configured (e.g., 90 days).",
+    "Expected Result": "Data older than retention threshold is removed/archived; UI and queries do not return purged records.",
+    "image_ref": "no",
+    "priority": "Medium",
+    "type": "Functional",
+    "steps": [
+      "Step 1: Identify records older than retention",
+      "Step 2: Trigger or wait for retention job",
+      "Step 3: Verify purge/archive completion",
+      "Step 4: Query for old records and verify absence"
+    ],
+    "requirement_mapping": null
+  },
+  {
+    "test_id": "OPEN-QUESTIONS",
+    "test_name": "Open Questions for Clarification",
+    "test_description": "The attached document 'Moogsoft BRD v4.1.3.docx' was referenced but its textual content was not accessible in this text-only mode. Test cases above are derived from standard Moogsoft AIOps platform capabilities and general BRD patterns. Confirm: (1) exact clustering algorithm and thresholds, (2) configured severity scale and field mappings, (3) RBAC matrix and role names, (4) enabled integrations (ServiceNow, Slack/Teams, email, SSO IdP), (5) retention/archival periods, (6) performance SLOs and target EPS, (7) maintenance window scope rules, (8) notification policy specifics, (9) audit log fields, (10) any custom enrichment/CMDB sources.",
+    "preconditions": "N/A",
+    "Expected Result": "N/A",
+    "image_ref": "no",
+    "priority": "High",
+    "type": "Functional",
+    "steps": [],
+    "requirement_mapping": null
+  }
+]

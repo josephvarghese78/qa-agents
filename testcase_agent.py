@@ -128,25 +128,15 @@ async def main():
     # Example prompts and localized documents
     user_prompt = testcase_prompt#"Analyze these requirements and generate 3 comprehensive integration test cases using PyTest."
     attached_files = ["./Incoming/Moogsoft BRD v4.1.docx"]
-    context_str=""
+    attachments=[]
     for f in attached_files:
-        try:
-            file_name = os.path.basename(f)
-            file_content = d.extract_text_from_file(f)
-            context_str += f"\n--- ATTACHMENT START: {file_name} ---\n{file_content}\n--- ATTACHMENT END ---\n"
-
-        except Exception as e:
-            #print(f"⚠️ Failed to extract text from {f}. Error: {e}")
-            return
+        attachments.append({"type": "file", "path":f})
 
     print("🤖 Processing attachments and contacting GitHub Copilot Runtime...")
     try:
         copilot_reply = await ae.ask_copilot_with_attachments(
            prompt=user_prompt,
-            attachments=[{
-                "type": "file",
-                "path": "./Incoming/Moogsoft BRD v4.1.3.docx"
-            }],
+            attachments=attachments,
            model="claude-opus-4.7"  # Optional: Toggle models depending on subscription access (e.g., 'gpt-5')
         )
         print("\n🤖 Copilot Response:\n")
