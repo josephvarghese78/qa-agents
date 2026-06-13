@@ -10,13 +10,12 @@ from copilot.session_events import (
     ToolExecutionStartData,
     SessionIdleData
 )
-import authorize as ae
-
-GITHUB_TOKEN = ae.get_token()
 
 
 
-async def ask_copilot_with_attachments(prompt, attachments, model = None) -> str:
+
+
+async def ask_copilot_with_attachments(token, prompt, attachments, model = None) -> str:
     """
     Reusable engine that accepts a prompt and a list of file attachments,
     parses them into context, and returns the Copilot response using the SDK.
@@ -28,12 +27,14 @@ async def ask_copilot_with_attachments(prompt, attachments, model = None) -> str
     #    final_prompt = f"Context from attachments:\n{attachments}\n\nUser Question:\n{prompt}"
 
     response_content = []
+    session_log = []
 
     #print(final_prompt)
     #print("")
 
     # 3. Spin up the Copilot SDK Client and Session via async context managers
     async with CopilotClient() as client:
+
         session_args = {
         "on_permission_request":PermissionHandler.approve_all,
         "system_message":{
@@ -44,7 +45,7 @@ async def ask_copilot_with_attachments(prompt, attachments, model = None) -> str
                     Return all generated content directly in the response.
             """
         },
-        "github_token":GITHUB_TOKEN
+        "github_token":token
         }
 
         if model:
@@ -59,10 +60,11 @@ async def ask_copilot_with_attachments(prompt, attachments, model = None) -> str
             def on_event(event):
                 # Check for incoming assistant message variations based on SDK spec
                 print(event)
+                session_log.append(event)
                 if isinstance(event.data, AssistantMessageData):
                     content = getattr(event.data, "content", "")
                     if content:
-                        print(content)
+                        #print(content)
                         response_content.append(content)
                 #elif hasattr(event.data, "type") and event.data.type == "session.idle":
                 elif isinstance(event.data, SessionIdleData):

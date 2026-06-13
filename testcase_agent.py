@@ -2,6 +2,7 @@ import agentengine as ae
 import asyncio
 import documents as d
 import os
+from helperfunctions import InputParser
 
 testcase_prompt="""
 You are a senior QA automation architect with expertise in functional, integration, regression, and edge-case testing.
@@ -124,17 +125,26 @@ Provide ONLY:
 """
 
 # --- Verification Execution ---
-async def main():
+async def main(prj_file):
+    inpprsr=InputParser(prj_file)
+
+    copilot_token=inpprsr.token()
+    repo=inpprsr.repo()
+    documents = inpprsr.documents()
+
     # Example prompts and localized documents
     user_prompt = testcase_prompt#"Analyze these requirements and generate 3 comprehensive integration test cases using PyTest."
-    attached_files = ["./Incoming/Moogsoft BRD v4.1.docx"]
     attachments=[]
-    for f in attached_files:
-        attachments.append({"type": "file", "path":f})
+
+    for f in documents:
+        doc_name=f.get("name", "")
+        if doc_name:
+            attachments.append({"type": "file", "path":f"./documents/project-documents/{repo}/{doc_name}"})
 
     print("🤖 Processing attachments and contacting GitHub Copilot Runtime...")
     try:
         copilot_reply = await ae.ask_copilot_with_attachments(
+            token=copilot_token,
            prompt=user_prompt,
             attachments=attachments,
            model="claude-opus-4.7"  # Optional: Toggle models depending on subscription access (e.g., 'gpt-5')
@@ -146,4 +156,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main("./documents/input/project1.json"))
