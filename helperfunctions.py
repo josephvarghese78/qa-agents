@@ -16,22 +16,35 @@ class InputParser:
 
 
     def token(self):
-        return self.jsonfile["token"]
+        return self.jsonfile.get("token", None)
+
+    def agents(self):
+        agent_type=self.jsonfile.get("agent", None)
+        if agent_type in ["planning"]:
+            agents= ["precheck", "testplan", "testcase"]
+        elif agent_type in ["scripting"]:
+            agents= ["scripting"]
+        else:
+            agents=[]
+
+        return agents
 
     def name(self):
-        return self.jsonfile["name"]
+        return self.jsonfile.get("name", None)
 
     def repo(self):
-        return self.jsonfile["repo"]
+        return self.jsonfile.get("repo", None)
 
     def documents(self):
-        return self.jsonfile["documents"]
+        return self.jsonfile.get("documents", None)
 
     def jirainfo(self):
-        return self.jsonfile["jira"]["token"], self.jsonfile["jira"]["email"]
+        jira_data=self.jsonfile.get("jira")
+        return jira_data.get("token", None), jira_data.get("email")
 
     def stories(self):
-        return self.jsonfile["jira"]["stories"]
+        jira_data = self.jsonfile.get("jira")
+        return jira_data.get("stories", None)
 
 
 
