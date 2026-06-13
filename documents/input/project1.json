@@ -1,0 +1,16 @@
+{
+  "name": "ETS",
+  "token": "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",
+  "repo": "moogsoft",
+  "documents": [
+    {
+      "name": "Moogsoft BRD v4.1.3.docx",
+      "type": "brd"
+    }
+  ],
+  "jira": {
+    "token": "",
+    "email": "",
+    "stories": ["GFDOETS-524"]
+  }
+}
