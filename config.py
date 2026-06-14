@@ -1,6 +1,0 @@
-XRAY_BASE_URL= "https://xray.cloud.getxray.app",
-JIRA_BASE_URL= "https://manulife-gft.atlassian.net",
-XRAY_AUTH_ENDPOINT= "/api/v2/authenticate",
-XRAY_IMPORT_ENDPOINT= "/api/v2/import/test/bulk",
-XRAY_GRAPHQL_ENDPOINT= "/api/v2/graphql",
-XRAY_INSECURE_SSL= "false",
