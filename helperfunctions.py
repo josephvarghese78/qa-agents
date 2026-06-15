@@ -160,16 +160,34 @@ class Utils:
             return 'None'
 
     def extract_jsondata(self, text):
-        cleaned = text.strip()
-        if cleaned.startswith("```") and cleaned.endswith("```"):
-            lines = cleaned.splitlines()
-            if lines and lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            cleaned = "\n".join(lines).strip()
+        # remove ```json fences
+        text = re.sub(r"```json\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"```", "", text)
 
-        return json.loads(cleaned)
+        results = []
+        decoder = json.JSONDecoder()
+        i = 0
+        n = len(text)
+
+        while i < n:
+            if text[i] in "[{":
+                try:
+                    obj, end = decoder.raw_decode(text[i:])
+                    i += end
+
+                    # FLATTEN LOGIC HERE
+                    if isinstance(obj, list):
+                        results.extend(obj)
+                    else:
+                        results.append(obj)
+
+                    continue
+                except json.JSONDecodeError:
+                    pass
+
+            i += 1
+
+        return results
 
     def log(self, repo, agent_type, event_log, copilot_reply):
         lock = threading.Lock()
