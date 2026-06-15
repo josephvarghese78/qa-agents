@@ -9,6 +9,169 @@ import os
 import threading
 import re
 
+
+
+
+# Function to convert JSON to CSV
+    def json_to_csv(self, json_text, csv_file_path):
+
+        json_data = self.extract_jsondata(json_text)
+
+        json_expanded = None
+        # Convert JSON data to pandas DataFrame
+        df = pd.json_normalize(json_data)
+
+        # --- for Req Analysis ---
+        if 'Req_Analysis_Result_Details' in df.columns:
+            # Reset index BEFORE normalizing so both frames share a unique 0..N index
+            df = df.explode('Req_Analysis_Result_Details').reset_index(drop=True)
+
+            # Drop rows where details is missing/empty to avoid normalize errors
+            df = df[df['Req_Analysis_Result_Details'].notna()].reset_index(drop=True)
+
+            # Flatten inner structure
+            details_df = pd.json_normalize(df['Req_Analysis_Result_Details']).reset_index(drop=True)
+            df = df.drop(columns=['Req_Analysis_Result_Details'])
+            df = pd.concat([df, details_df], axis=1)
+
+            # Each item in Questions is normally a list with a single dict like
+            #   [{"question-1": "...", "question-2": "...", "question-n": "..."}]
+            # We want ONE row per individual question, with a Question_No column.
+            if 'Questions' in df.columns:
+                # 1) Explode the outer list -> one dict (or NaN) per row
+                df = df.explode('Questions').reset_index(drop=True)
+
+                # 2) Convert that dict into an ordered list of question strings
+                def _questions_to_list(q):
+                    if isinstance(q, dict):
+                        try:
+                            ordered_keys = sorted(
+                                q.keys(),
+                                key=lambda k: int(str(k).split('-')[-1])
+                            )
+                        except Exception:
+                            ordered_keys = list(q.keys())
+                        return [q[k] for k in ordered_keys]
+                    if isinstance(q, list):
+                        return q
+                    return []  # NaN / missing
+
+                df['Steps'] = df['Questions'].apply(_questions_to_list)
+                df['Question_No'] = df['Steps'].apply(
+                    lambda lst: list(range(1, len(lst) + 1)) if isinstance(lst, list) else []
+                )
+                df = df.drop(columns=['Questions'])
+
+                # 3) Explode the per-row list -> one row per question
+                df = df.explode(['Steps', 'Question_No']).reset_index(drop=True)
+            else:
+                df['Steps'] = ''
+                df['Question_No'] = ''
+
+            json_expanded = df
+
+        # --- Test Case format ---
+        elif 'Test case ID' in df.columns:
+            if 'Test Steps' in df.columns:
+                df.rename(columns={'Test Steps': 'Steps'}, inplace=True)
+            else:
+                df['Steps'] = ''
+
+            json_expanded = df
+        # --- END ---
+
+        # Split each step in [Test Steps] into a new row
+        try:
+            json_expanded = json_expanded.explode('Steps')
+        except:
+            pass
+
+        #  TEST CASE FLOW
+        if 'Test case ID' in json_expanded.columns:
+
+            # Add new columns with default string values
+            default_values = {
+                'Test Repository Path': 'Project_or_Sprint_Segment_Name/Subtotals',
+                'Test Type': 'Manual',
+                'Test Method': 'Manual',
+                'Environment': 'QA',
+                'Assignee': self.get_current_user(),
+                'Application': 'TBD',
+                'Test Priority': 'Medium',
+                'Label': 'Document file name',
+                'Category/Type': 'Functional Testing - System Integration Testing',
+                'Complexity': 'Medium',
+                'Reviewed and Baseline': 'No'
+            }
+            for column, value in default_values.items():
+                json_expanded[column] = value
+
+            # Initialize an empty list to store the transformed rows
+            transformed_data = []
+
+            # Columns to be cleared
+            columns_to_clear = [
+                'Test case ID', 'Test Repository Path', 'Test Type', 'Test Method', 'Summary', 'Description',
+                'Expected Results', 'Environment', 'Assignee', 'Application', 'Test Priority', 'Label',
+                'Category/Type', 'Complexity', 'Reviewed and Baseline'
+            ]
+
+            # Iterate through the DataFrame and transform the data
+            for key, group in json_expanded.groupby(columns_to_clear):
+                first_row = group.iloc[0].copy()
+                expected_result = first_row['Expected Results']
+                first_row['Expected Results'] = ''
+                transformed_data.append(first_row)
+
+                for i in range(1, len(group)):
+                    row = group.iloc[i].copy()
+                    row[columns_to_clear] = ''
+                    row['Expected Results'] = expected_result if i == len(group) - 1 else ''
+                    transformed_data.append(row)
+
+            # Create the new DataFrame from the transformed data
+            grouped_df = pd.DataFrame(transformed_data)
+
+            # Reorder the columns for Test Case
+            column_order = [
+                'Test case ID', 'Test Repository Path', 'Test Type', 'Test Method', 'Summary', 'Description',
+                'Steps', 'Expected Results', 'Environment', 'Assignee', 'Application', 'Test Priority', 'Label',
+                'Category/Type', 'Complexity', 'Reviewed and Baseline'
+            ]
+
+            available_columns = [col for col in column_order if col in grouped_df.columns]
+            grouped_df = grouped_df[available_columns]
+
+        else:
+            # REQ ANALYSIS FLOW (row-wise clean format)
+            grouped_df = json_expanded
+
+            # Column order for Req Analysis (same as earlier CSV)
+            analysis_column_order = [
+                'Req_id', 'Req_Analysis_Result', 'Req_Analysis_Score', 'Observation',
+                'Category', 'Severity', 'Req_type', 'Location', 'Question_No', 'Steps'
+            ]
+
+            available_columns = [col for col in analysis_column_order if col in grouped_df.columns]
+            grouped_df = grouped_df[available_columns]
+
+        # Final column naming
+        if 'Test case ID' in grouped_df.columns:
+            # Test Case → rename Steps → Test Steps
+            grouped_df.rename(columns={'Steps': 'Test Steps'}, inplace=True)
+        else:
+            # Req Analysis → rename Steps → Questions
+            grouped_df.rename(columns={'Steps': 'Questions'}, inplace=True)
+
+        # Write to CSV
+        grouped_df.to_csv(csv_file_path, index=False)
+
+
+
+
+
+
+
 class InputParser:
     def __init__(self, path):
         self.path = path
