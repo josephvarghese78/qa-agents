@@ -1,4 +1,3 @@
-import json
 import config as cfg
 import httpx
 import json
@@ -8,6 +7,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import threading
+import re
 
 class InputParser:
     def __init__(self, path):
@@ -203,10 +203,39 @@ class Utils:
             with open(f'./documents/project-documents/{repo}/{agent_type}/{newfolder}/log/copilot_response.log', 'a', encoding='utf-8') as response_file:
                 response_file.write(copilot_reply)
 
-    # Function to convert JSON to CSV
-    def json_to_csv(self, json_text, csv_file_path):
+            json_formatted = json.dumps(self.extract_jsondata(copilot_reply), indent=4)
+            self.savejson(json_formatted, f'./documents/project-documents/{repo}/{agent_type}/{newfolder}/s')
 
-        json_data=self.extract_jsondata(json_text)
+            if agent_type == "ReqCheckAgent":
+                #json to simple csv for reqcheckagent
+                pass
+            elif agent_type == "TestPlanAgent":
+                #json to ppt template
+                pass
+            elif agent_type == "TestCaseAgent":
+                os.makedirs(f'./documents/project-documents/{repo}/{agent_type}/{newfolder}/log', exist_ok=True)
+                self.json_to_xraycsv(json_formatted, '')
+            elif agent_type == "ScriptingAgent":
+                #atomscript
+                pass
+
+
+
+    def savejson(self, json_formatted, json_file):
+        os.makedirs(json_file, exist_ok=True)
+        with open(f"{json_file}/copilot_response.json", 'a',encoding='utf-8') as json_file:
+            json_file.write(json_formatted)
+
+
+
+    #function to convert JSON to ppt
+
+
+    # Function to convert JSON to CSV
+    def json_to_xraycsv(self, json_text, csv_file_path):
+
+        json_data=json.loads(json_text)
+
 
         test_steps_expanded=None
         # Convert JSON data to pandas DataFrame
