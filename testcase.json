@@ -1,0 +1,915 @@
+[
+    {
+        "test_id": "TC-001",
+        "test_name": "One-time historical backfill of alert data into consolidated table",
+        "test_description": "Validate that during initial load, all historical alert data (active alert + alert_archive) is extracted from Moogsoft SQL Server and consolidated into MLF_AIOps_Alert_Until<YYYYMMDD> table in the EDL with alert_id as the primary key.",
+        "preconditions": "Moogsoft SQL Server source is accessible; alert and alert_archive tables contain historical records; EDL Landing and Raw layers are provisioned; SPN credentials are configured.",
+        "Expected Result": "Backfill pipeline successfully copies all records older than 13 months from alert_archive and active records (<13 months) from alert into MLF_AIOps_Alert_Until<YYYYMMDD>; alert_id is unique and used as pk_id; record count matches source total.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Verify alert and alert_archive source tables are populated and accessible via SPN.",
+            "Step 2: Trigger the one-time historical backfill pipeline for alerts.",
+            "Step 3: Validate target table MLF_AIOps_Alert_Until<YYYYMMDD> is created with correct cutoff date token.",
+            "Step 4: Compare row counts between source (alert + alert_archive) and target consolidated table.",
+            "Step 5: Confirm alert_id is the pk_id and contains no duplicates or nulls."
+        ],
+        "requirement_mapping": "Section 1.1 In Scope - One-Time Historical Backfill; Section 1.5 Functional Requirements - Historical Backfill"
+    },
+    {
+        "test_id": "TC-002",
+        "test_name": "One-time historical backfill of situation data into consolidated table",
+        "test_description": "Validate that during initial load, all historical situation data (active situation + situation_archive) is consolidated into MLF_AIOps_Situation_Until<YYYYMMDD> with situation_id as the primary key.",
+        "preconditions": "situation and situation_archive tables exist in Moogsoft SQL Server; EDL is configured; SPN access is granted.",
+        "Expected Result": "MLF_AIOps_Situation_Until<YYYYMMDD> contains the full union of active and archive situation data; situation_id is pk_id, unique and non-null; row counts reconcile with source.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Verify situation and situation_archive source availability.",
+            "Step 2: Execute the historical backfill pipeline for situations.",
+            "Step 3: Validate the consolidated target table MLF_AIOps_Situation_Until<YYYYMMDD> is created.",
+            "Step 4: Reconcile record counts between source and target.",
+            "Step 5: Validate uniqueness and non-nullness of situation_id."
+        ],
+        "requirement_mapping": "Section 1.1 In Scope; Section 1.5 Historical Backfill & Dataset Unification"
+    },
+    {
+        "test_id": "TC-003",
+        "test_name": "Historical consolidated datasets are not re-ingested after backfill",
+        "test_description": "Validate that once the one-time historical backfill is completed, the MLF_AIOps_Alert_Until<YYYYMMDD> and MLF_AIOps_Situation_Until<YYYYMMDD> tables are not refreshed or re-ingested by any subsequent pipeline run.",
+        "preconditions": "Historical backfill has been completed successfully; consolidated Until<YYYYMMDD> tables exist.",
+        "Expected Result": "No scheduled or NRT pipeline modifies, refreshes, or reloads the historical consolidated tables; row counts and content remain immutable across subsequent runs.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Capture row count and checksum of the consolidated historical tables post-backfill.",
+            "Step 2: Run NRT and daily batch pipelines for multiple cycles.",
+            "Step 3: Re-check the row count and checksum of the historical tables.",
+            "Step 4: Confirm no modifications occurred."
+        ],
+        "requirement_mapping": "Section 1.1 - 'These consolidated historical datasets will not be refreshed or re-ingested after the initial load'"
+    },
+    {
+        "test_id": "TC-004",
+        "test_name": "Cutoff date token <YYYYMMDD> applied correctly in table name",
+        "test_description": "Verify that the <YYYYMMDD> token used in the consolidated historical table name accurately reflects the cutoff date applied to the backfill snapshot.",
+        "preconditions": "Backfill snapshot cutoff date is defined and documented.",
+        "Expected Result": "Both MLF_AIOps_Alert_Until<YYYYMMDD> and MLF_AIOps_Situation_Until<YYYYMMDD> table names contain a valid YYYYMMDD date matching the configured snapshot cutoff date.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Configure backfill cutoff date.",
+            "Step 2: Run backfill pipeline.",
+            "Step 3: Inspect target table names in EDL.",
+            "Step 4: Validate format YYYYMMDD and value matches configured cutoff."
+        ],
+        "requirement_mapping": "Section 1.1 In Scope; Section 1.5 Historical Backfill"
+    },
+    {
+        "test_id": "TC-005",
+        "test_name": "Daily batch ingestion of qa_teams (DEV) executes at 9 AM EST",
+        "test_description": "Verify that daily batch ingestion of qa_teams runs incrementally and is triggered at 9 AM EST, loading new and updated records only into the Landing and Raw layers.",
+        "preconditions": "qa_teams table populated with watermark column; scheduler configured for 9 AM EST; SPN access available.",
+        "Expected Result": "Pipeline triggers at 9 AM EST, loads only delta records based on the watermark, and updates Landing and Raw layers without reloading history.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Insert and update qa_teams records in source.",
+            "Step 2: Wait for or trigger scheduled job at 9 AM EST.",
+            "Step 3: Confirm only new/updated records are present in Landing and Raw.",
+            "Step 4: Verify watermark column value is advanced after the run."
+        ],
+        "requirement_mapping": "Section 1.1 - Daily Batch Ingestion"
+    },
+    {
+        "test_id": "TC-006",
+        "test_name": "Daily batch incremental ingestion for qa_mtta, qa_mttd, qa_mttr",
+        "test_description": "Validate that qa_mtta, qa_mttd, and qa_mttr datasets are ingested incrementally each day using watermarking, capturing only new and changed records.",
+        "preconditions": "Source tables qa_mtta/qa_mttd/qa_mttr have watermark columns and incremental records present.",
+        "Expected Result": "Only delta rows after the previous watermark value are ingested into Raw layer; unchanged rows are skipped; watermark is advanced atomically.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Capture current watermark for each table.",
+            "Step 2: Insert/update records with timestamps greater than the watermark.",
+            "Step 3: Trigger daily batch pipeline.",
+            "Step 4: Validate only new/updated rows appear in Raw.",
+            "Step 5: Confirm watermark advanced and persisted."
+        ],
+        "requirement_mapping": "Section 1.1 - Daily Batch Ingestion; Section 1.5 Incremental & Full Load Support"
+    },
+    {
+        "test_id": "TC-007",
+        "test_name": "Daily full load ingestion for onboardedTeams",
+        "test_description": "Validate that the onboardedTeams table is ingested using a full-load (daily-full) strategy, replacing the target dataset entirely on each run rather than incrementally.",
+        "preconditions": "onboardedTeams source table populated; pipeline configured as full-load.",
+        "Expected Result": "Each daily run overwrites/refreshes the onboardedTeams Raw layer dataset with the complete current source content; deleted source rows are not retained in target.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Capture current source row count for onboardedTeams.",
+            "Step 2: Delete and insert records in source to vary content.",
+            "Step 3: Trigger daily batch pipeline.",
+            "Step 4: Validate Raw layer matches source exactly post-load."
+        ],
+        "requirement_mapping": "Section 1.1 - onboardedTeams table will be daily-full load"
+    },
+    {
+        "test_id": "TC-008",
+        "test_name": "NRT ingestion of alert data into MLF_AIOps_Alert_Streaming",
+        "test_description": "Validate that the dedicated NRT pipeline ingests new alert events from Event Hub into MLF_AIOps_Alert_Streaming approximately every 5 seconds using watermark tracking.",
+        "preconditions": "Event Hub topic moogsoft-alerts-eh is active; SPN gf-etsolive-dev/qa is configured; NRT pipeline is deployed and running.",
+        "Expected Result": "New alert records are written to MLF_AIOps_Alert_Streaming within an approximate 5-second ingestion cycle; only inserts and updates are processed; no historical loads occur.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Publish test alert events to Event Hub topic.",
+            "Step 2: Observe MLF_AIOps_Alert_Streaming for new rows.",
+            "Step 3: Validate latency from event publish to availability is ~5 seconds per cycle.",
+            "Step 4: Confirm no archive/history rows are pulled in."
+        ],
+        "requirement_mapping": "Section 1.1 NRT/Streaming Ingestion; Section 1.5 NRT Ingestion"
+    },
+    {
+        "test_id": "TC-009",
+        "test_name": "NRT ingestion of situation data into MLF_AIOps_Situation_Streaming",
+        "test_description": "Validate that the NRT pipeline writes situation events from Event Hub to MLF_AIOps_Situation_Streaming using watermark-based capture for inserts and updates only.",
+        "preconditions": "Event Hub for situations is active; NRT pipeline deployed; watermark column available.",
+        "Expected Result": "Situation events appear in MLF_AIOps_Situation_Streaming with near real-time latency; inserts and updates handled; no backfill executed.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Emit insert and update situation events.",
+            "Step 2: Verify both event types are reflected in MLF_AIOps_Situation_Streaming.",
+            "Step 3: Confirm watermark advanced for each cycle.",
+            "Step 4: Verify no historical/archive data was loaded."
+        ],
+        "requirement_mapping": "Section 1.5 NRT Ingestion"
+    },
+    {
+        "test_id": "TC-010",
+        "test_name": "NRT end-to-end latency within 60 seconds",
+        "test_description": "Validate that the NRT pipeline delivers alert and situation data to the Raw layer and downstream consumers (e.g., Power BI) within the required \u226460-second end-to-end latency.",
+        "preconditions": "NRT pipeline running; downstream consumer (Power BI) connected; clock-synchronized test instrumentation.",
+        "Expected Result": "Time from source event generation to downstream availability is consistently \u226460 seconds across multiple measurements.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Emit timestamped test event at source.",
+            "Step 2: Measure arrival time in Raw layer.",
+            "Step 3: Measure arrival time at Power BI downstream.",
+            "Step 4: Confirm total latency \u226460 seconds across \u226530 samples."
+        ],
+        "requirement_mapping": "Section 1.5 Downstream Data Availability; Section 1.6 Performance & Latency"
+    },
+    {
+        "test_id": "TC-011",
+        "test_name": "NRT pipeline runs independently from backfill and batch pipelines",
+        "test_description": "Validate that the NRT pipeline operates on a separate, dedicated infrastructure and is not impacted by the historical backfill or daily batch ingestion pipelines.",
+        "preconditions": "Backfill, daily batch, and NRT pipelines are all deployed.",
+        "Expected Result": "Failures, restarts, or executions of the backfill/batch pipelines do not interrupt or affect NRT ingestion latency or throughput.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Integration",
+        "steps": [
+            "Step 1: Start NRT pipeline and observe baseline latency.",
+            "Step 2: Trigger daily batch and a re-run of backfill (in lower env).",
+            "Step 3: Stop/restart the batch pipeline mid-run.",
+            "Step 4: Verify NRT pipeline continues without disruption and remains within latency SLA."
+        ],
+        "requirement_mapping": "Section 1.5 NRT Ingestion - Separate Pipeline"
+    },
+    {
+        "test_id": "TC-012",
+        "test_name": "Logical and physical separation of historical and streaming datasets",
+        "test_description": "Validate that *_Until<YYYYMMDD> historical and *_Streaming NRT datasets are kept logically and physically separate with no automated unification.",
+        "preconditions": "Both historical and streaming datasets exist in EDL.",
+        "Expected Result": "Datasets reside in distinct tables/locations; no pipeline merges them; cross-dataset queries only succeed via explicit JOIN views.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Inspect EDL catalog for both dataset families.",
+            "Step 2: Confirm distinct storage paths/tables.",
+            "Step 3: Verify no ingestion job writes into both.",
+            "Step 4: Validate JOIN view between MLF_AIOps_Alert_Until<YYYYMMDD> and MLF_AIOps_Alert_Streaming returns expected unified result."
+        ],
+        "requirement_mapping": "Section 1.1 Dataset Separation"
+    },
+    {
+        "test_id": "TC-013",
+        "test_name": "Joined view of historical and streaming datasets for pre-cutoff queries",
+        "test_description": "Validate that queries needing data both before and after the <YYYYMMDD> cutoff return correct results when issued against the JOIN of historical and streaming tables.",
+        "preconditions": "Both historical and streaming alert tables are populated with overlapping/contiguous data ranges.",
+        "Expected Result": "JOIN(MLF_AIOps_Alert_Until<YYYYMMDD>, MLF_AIOps_Alert_Streaming) returns complete dataset spanning historical and streaming periods without duplicates or gaps at the cutoff boundary.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Integration",
+        "steps": [
+            "Step 1: Identify alerts spanning before and after the cutoff date.",
+            "Step 2: Query joined view.",
+            "Step 3: Validate row counts and absence of duplicates at the boundary.",
+            "Step 4: Confirm chronological continuity."
+        ],
+        "requirement_mapping": "Section 1.1 Dataset Separation"
+    },
+    {
+        "test_id": "TC-014",
+        "test_name": "Schema conformity and data type validation before Raw load",
+        "test_description": "Validate that the system enforces schema conformity, expected data types, and presence of required fields prior to loading data into the Raw layer.",
+        "preconditions": "Schema definitions are configured; test data includes valid and schema-violating records.",
+        "Expected Result": "Records that match schema/data type rules pass validation and are loaded; records that violate schema are rejected/quarantined with logged validation failures.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Validation",
+        "steps": [
+            "Step 1: Inject mix of valid and invalid records (wrong types, missing required fields).",
+            "Step 2: Run ingestion pipeline.",
+            "Step 3: Verify valid records reach Raw and invalid records are rejected/quarantined.",
+            "Step 4: Confirm validation failures appear in logs."
+        ],
+        "requirement_mapping": "Section 1.5 Data Quality & Validation"
+    },
+    {
+        "test_id": "TC-015",
+        "test_name": "No PII or PHI fields ingested",
+        "test_description": "Validate that no PII or PHI fields from Moogsoft data are extracted, stored, or transmitted into the Landing or Raw EDL layers.",
+        "preconditions": "PII/PHI exclusion policy and field denylist are configured; data scanning rules in place.",
+        "Expected Result": "Scans of Landing and Raw datasets show no PII or PHI attributes; any detection triggers immediate alert and governance notification.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Security",
+        "steps": [
+            "Step 1: Run automated PII/PHI scanner across Landing and Raw datasets.",
+            "Step 2: Verify scan results show zero violations.",
+            "Step 3: Inject a synthetic PII record into source.",
+            "Step 4: Confirm record is blocked/quarantined and governance alert is generated."
+        ],
+        "requirement_mapping": "Section 1.4 Constraints - Data Privacy; Section 1.5 Data Quality & Validation; Section 1.6 Compliance & Governance"
+    },
+    {
+        "test_id": "TC-016",
+        "test_name": "Malformed records are rejected and logged",
+        "test_description": "Validate that invalid or malformed records are rejected by the ingestion pipeline and the rejection details are written to logs for remediation.",
+        "preconditions": "Logging and quarantine destinations configured.",
+        "Expected Result": "Malformed records do not enter Raw layer; rejection logs contain timestamp, record identifier (or hash), and reason for rejection.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Negative",
+        "steps": [
+            "Step 1: Inject malformed JSON/row into source or Event Hub.",
+            "Step 2: Run pipeline.",
+            "Step 3: Validate record is not present in Raw layer.",
+            "Step 4: Verify log/quarantine entry created with descriptive failure reason."
+        ],
+        "requirement_mapping": "Section 1.5 Data Quality & Validation; Section 1.6 Data Quality"
+    },
+    {
+        "test_id": "TC-017",
+        "test_name": "SCD Type 2 versioning using source last_state_change",
+        "test_description": "Validate that NRT ingestion implements system-driven SCD Type 2 versioning by closing the previous version (End_AT = last_state_change) and inserting a new version (Start_AT = last_state_change) when a newer event for the same key arrives.",
+        "preconditions": "NRT pipeline configured with SCD2 logic; sample records with multiple last_state_change updates available.",
+        "Expected Result": "For every update to an existing key, prior row's End_AT equals new event's last_state_change and a new row is inserted with Start_AT = last_state_change; previous open versions are properly closed; only one current/open row per key exists.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Insert original alert event v1 with last_state_change=T1.",
+            "Step 2: Emit updated event v2 with last_state_change=T2.",
+            "Step 3: Query SCD2 target table by alert key.",
+            "Step 4: Verify v1 row End_AT=T2 and v2 row Start_AT=T2 with End_AT null/open.",
+            "Step 5: Repeat with a third update and confirm only the latest version is open."
+        ],
+        "requirement_mapping": "Section 1.5 Addendum - System-Driven SCD Type 2 Versioning"
+    },
+    {
+        "test_id": "TC-018",
+        "test_name": "System-generated insertdt represents ingestion time",
+        "test_description": "Validate that the system populates the insertdt field with the actual ingestion timestamp for every NRT record, since this field is not provided by the source.",
+        "preconditions": "NRT pipeline generates insertdt during write.",
+        "Expected Result": "Every ingested record contains a non-null insertdt value reflecting the ingestion time (within a few seconds of pipeline write); value is monotonically reasonable across batches.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Emit a timestamped event to Event Hub.",
+            "Step 2: Capture ingestion time on the pipeline side.",
+            "Step 3: Query target table for insertdt of that record.",
+            "Step 4: Confirm insertdt aligns with ingestion clock and is non-null."
+        ],
+        "requirement_mapping": "Section 1.5 Addendum - System-Generated Fields"
+    },
+    {
+        "test_id": "TC-019",
+        "test_name": "System-generated db_alert_id and db_situation_id are unique",
+        "test_description": "Validate that the ingestion system generates db_alert_id for alert records and db_situation_id for situation records, since the source does not provide these identifiers, and that the generated values are unique.",
+        "preconditions": "NRT pipeline configured to generate ids; sample alert and situation events available.",
+        "Expected Result": "Every alert row has a non-null unique db_alert_id; every situation row has a non-null unique db_situation_id; no collisions across the dataset.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Emit batches of alert and situation events.",
+            "Step 2: Query streaming tables for the generated id columns.",
+            "Step 3: Verify uniqueness via count(distinct)=count(*).",
+            "Step 4: Verify no null values exist."
+        ],
+        "requirement_mapping": "Section 1.5 Addendum - System-Generated Fields"
+    },
+    {
+        "test_id": "TC-020",
+        "test_name": "SPN-based authentication enforced for ingestion",
+        "test_description": "Validate that all ingestion pipelines authenticate using approved Service Principals (e.g., gf-etsolive-dev, gf-etsolive-qa) with least-privilege access, and pipelines fail when SPN credentials are invalid.",
+        "preconditions": "SPNs registered and access-bound; ability to substitute invalid credentials in test.",
+        "Expected Result": "Pipelines run successfully with approved SPN; runs with invalid/expired/unauthorized SPN fail authentication and produce clear error messages without writing data.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Security",
+        "steps": [
+            "Step 1: Run pipeline with approved SPN and verify success.",
+            "Step 2: Substitute SPN with an unauthorized identity.",
+            "Step 3: Trigger pipeline.",
+            "Step 4: Verify authentication failure, no data written, and security log entry."
+        ],
+        "requirement_mapping": "Section 1.4 Constraints - Security & Access Control; Section 1.5 Security & Controlled Access"
+    },
+    {
+        "test_id": "TC-021",
+        "test_name": "Role-based access to Raw layer datasets",
+        "test_description": "Validate that access to ingested Moogsoft datasets in Landing and Raw layers is governed by platform-approved security roles and that unauthorized users cannot read or write to the datasets.",
+        "preconditions": "RBAC roles configured; test users provisioned with authorized and unauthorized roles.",
+        "Expected Result": "Authorized users/services can query datasets per their role permissions; unauthorized users receive an access denied error and the attempt is logged.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Security",
+        "steps": [
+            "Step 1: Authenticate as authorized user and query dataset.",
+            "Step 2: Authenticate as unauthorized user and attempt the same query.",
+            "Step 3: Verify the second attempt is denied.",
+            "Step 4: Confirm denial audit log entry."
+        ],
+        "requirement_mapping": "Section 1.5 Security & Controlled Access; Section 1.6 Security"
+    },
+    {
+        "test_id": "TC-022",
+        "test_name": "Encryption in transit and at rest",
+        "test_description": "Validate that any sensitive data is encrypted in transit between Moogsoft/Event Hub and EDL and at rest in Landing and Raw layers per enterprise security policy.",
+        "preconditions": "TLS configurations and storage encryption keys provisioned.",
+        "Expected Result": "Network traffic uses TLS 1.2+ and storage is encrypted with approved keys; encryption can be evidenced via configuration inspection.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Security",
+        "steps": [
+            "Step 1: Capture network handshake between pipeline and source/Event Hub.",
+            "Step 2: Verify TLS protocol/version is approved.",
+            "Step 3: Inspect storage account/container encryption settings.",
+            "Step 4: Confirm encryption is enabled with approved key management."
+        ],
+        "requirement_mapping": "Section 1.6 Security"
+    },
+    {
+        "test_id": "TC-023",
+        "test_name": "Ingestion activity logging completeness",
+        "test_description": "Validate that the system logs all ingestion activities including extraction, validation, and load events with timestamps, error descriptions, and run metadata.",
+        "preconditions": "Logging sinks configured and retention policy set.",
+        "Expected Result": "Every pipeline run emits logs covering each stage; logs contain timestamps, run id, dataset name, row counts, status, and error details when applicable.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Execute a successful pipeline run.",
+            "Step 2: Execute a failing pipeline run.",
+            "Step 3: Inspect logs for both runs.",
+            "Step 4: Validate all required fields present and stages covered."
+        ],
+        "requirement_mapping": "Section 1.5 Monitoring, Logging, and Error Handling; Section 1.6 Observability & Monitoring"
+    },
+    {
+        "test_id": "TC-024",
+        "test_name": "Alerts generated on ingestion failures and latency breaches",
+        "test_description": "Validate that the system generates alerts when ingestion fails, schema mismatches occur, NRT latency exceeds 60 seconds, or data quality errors are detected.",
+        "preconditions": "Alerting integration (e.g., monitoring tool, email/Teams) configured.",
+        "Expected Result": "Each failure scenario triggers an alert to the configured channel with descriptive context; no alert is generated for healthy runs.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Simulate pipeline failure (e.g., kill task).",
+            "Step 2: Inject schema mismatch.",
+            "Step 3: Throttle NRT to exceed 60-second latency.",
+            "Step 4: Verify alerts are raised for each scenario with appropriate severity and details."
+        ],
+        "requirement_mapping": "Section 1.5 Monitoring & Error Handling; Section 1.6 Observability & Monitoring"
+    },
+    {
+        "test_id": "TC-025",
+        "test_name": "Automatic recovery from transient failures",
+        "test_description": "Validate that the ingestion pipeline automatically recovers from transient failures (e.g., temporary network blip, source throttling) and resumes ingestion without manual intervention or data loss.",
+        "preconditions": "Retry logic configured; ability to simulate transient errors.",
+        "Expected Result": "Pipeline retries automatically per policy, recovers without manual action, and processes all records without duplication or loss after recovery.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Edge",
+        "steps": [
+            "Step 1: Inject a transient network error during a run.",
+            "Step 2: Observe retry attempts in logs.",
+            "Step 3: Verify pipeline completes successfully.",
+            "Step 4: Reconcile source and target counts to confirm zero data loss or duplication."
+        ],
+        "requirement_mapping": "Section 1.6 Availability & Reliability"
+    },
+    {
+        "test_id": "TC-026",
+        "test_name": "Run metadata captured for every ingestion execution",
+        "test_description": "Validate that every NRT and batch ingestion run records reliable run-time metadata including success/failure status, start/end time, row counts, and watermark progression.",
+        "preconditions": "Metadata table or run history store enabled.",
+        "Expected Result": "Each run is registered with a unique run id and complete metadata; metadata accurately reflects observable outcomes.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Trigger an NRT and a batch run.",
+            "Step 2: Query the run metadata store.",
+            "Step 3: Validate all required fields are populated and accurate."
+        ],
+        "requirement_mapping": "Section 1.6 Availability & Reliability; Observability & Monitoring"
+    },
+    {
+        "test_id": "TC-027",
+        "test_name": "Ingestion handles ~12-13 GB current dataset volume",
+        "test_description": "Validate that the solution successfully ingests the current full Moogsoft dataset volume (~12-13 GB) during the first historical backfill run without timeouts or resource exhaustion.",
+        "preconditions": "Production-scale data available in lower environment for load test.",
+        "Expected Result": "Backfill completes within acceptable runtime window; no out-of-memory, no source/sink throttling-related failures; full fidelity preserved.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Edge",
+        "steps": [
+            "Step 1: Stage 12-13 GB representative dataset.",
+            "Step 2: Execute backfill pipeline end-to-end.",
+            "Step 3: Monitor resource utilization, throughput, and runtime.",
+            "Step 4: Validate all source rows are loaded with full fidelity."
+        ],
+        "requirement_mapping": "Section 1.6 Scalability & Throughput"
+    },
+    {
+        "test_id": "TC-028",
+        "test_name": "Source system performance protection during ingestion",
+        "test_description": "Validate that the ingestion process does not degrade Moogsoft SQL Server performance or availability under normal and peak loads.",
+        "preconditions": "Source DB monitoring instrumented; baseline performance metrics captured.",
+        "Expected Result": "Source CPU, memory, IO, and query latency remain within acceptable bounds during ingestion; no production incidents triggered.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Edge",
+        "steps": [
+            "Step 1: Capture baseline source metrics.",
+            "Step 2: Run backfill and concurrent batch jobs.",
+            "Step 3: Capture metrics during ingestion.",
+            "Step 4: Compare and confirm deltas are within acceptable thresholds."
+        ],
+        "requirement_mapping": "Section 1.4 Constraints - Source System Performance Protection"
+    },
+    {
+        "test_id": "TC-029",
+        "test_name": "Daily batch completes within operational window",
+        "test_description": "Validate that all daily batch-refreshed Moogsoft datasets complete the daily refresh within the defined operational window starting at 9 AM EST.",
+        "preconditions": "Daily batch schedule configured; SLA window defined.",
+        "Expected Result": "All five datasets (qa_teams, qa_mtta, qa_mttd, qa_mttr, onboardedTeams) complete refresh within the SLA window; SLA breaches generate alerts.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Trigger 9 AM EST daily batch.",
+            "Step 2: Track start and end time of each dataset's pipeline.",
+            "Step 3: Verify all complete within SLA.",
+            "Step 4: Simulate slow run and verify SLA-breach alert."
+        ],
+        "requirement_mapping": "Section 1.6 Performance & Latency"
+    },
+    {
+        "test_id": "TC-030",
+        "test_name": "Watermark-based incremental capture skips already-loaded records",
+        "test_description": "Validate that the watermark mechanism correctly captures only records newer than the last successful run's watermark, preventing duplicate ingestion.",
+        "preconditions": "Watermark column populated; previous successful run completed.",
+        "Expected Result": "Records with watermark <= last run's high-watermark are skipped; only newer records are loaded; no duplicates appear in target.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Capture last run watermark.",
+            "Step 2: Insert mix of old (<= watermark) and new (> watermark) records.",
+            "Step 3: Run pipeline.",
+            "Step 4: Validate only new records are loaded and no duplicates exist."
+        ],
+        "requirement_mapping": "Section 1.5 Incremental & Full Load Support"
+    },
+    {
+        "test_id": "TC-031",
+        "test_name": "Pipeline behavior when watermark column is missing or null",
+        "test_description": "Validate that the pipeline handles missing or null watermark column values gracefully by failing safely with a clear error rather than producing incorrect deltas.",
+        "preconditions": "Test source contains records with null watermark or missing watermark column.",
+        "Expected Result": "Pipeline detects the issue, fails fast with a descriptive error, raises an alert, and does not load partial/incorrect data.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Negative",
+        "steps": [
+            "Step 1: Inject record with null watermark value.",
+            "Step 2: Remove watermark column from a test source.",
+            "Step 3: Run pipeline.",
+            "Step 4: Verify clear failure, alert, and no corrupt data in target."
+        ],
+        "requirement_mapping": "Section 1.5 Data Quality & Validation; Incremental Load Support"
+    },
+    {
+        "test_id": "TC-032",
+        "test_name": "Source SQL Server unavailable during batch run",
+        "test_description": "Validate behavior when Moogsoft SQL Server is unavailable or unreachable at the time of a scheduled batch run.",
+        "preconditions": "Ability to simulate SQL Server outage or block network access.",
+        "Expected Result": "Pipeline retries per policy and fails gracefully with alert; no partial data written to Raw; next successful run resumes correctly from the prior watermark.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Negative",
+        "steps": [
+            "Step 1: Block connectivity to SQL Server.",
+            "Step 2: Trigger batch run.",
+            "Step 3: Observe retries and final failure.",
+            "Step 4: Restore connectivity and trigger next run; validate clean resume."
+        ],
+        "requirement_mapping": "Section 1.6 Availability & Reliability"
+    },
+    {
+        "test_id": "TC-033",
+        "test_name": "Event Hub disconnect during NRT ingestion",
+        "test_description": "Validate that the NRT pipeline handles Event Hub connectivity loss gracefully and resumes from the last committed offset/watermark upon reconnection.",
+        "preconditions": "Ability to simulate Event Hub outage.",
+        "Expected Result": "Pipeline pauses or retries during outage, recovers automatically when Event Hub is reachable, and processes all queued events without data loss or duplication.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Edge",
+        "steps": [
+            "Step 1: Establish baseline NRT ingestion.",
+            "Step 2: Simulate Event Hub disconnect.",
+            "Step 3: Restore connectivity after a defined period.",
+            "Step 4: Validate all events emitted during outage are eventually ingested with no duplicates."
+        ],
+        "requirement_mapping": "Section 1.6 Availability & Reliability"
+    },
+    {
+        "test_id": "TC-034",
+        "test_name": "13-month boundary cutoff between active and archive tables",
+        "test_description": "Validate the boundary handling between active (alert/situation) tables (<13 months) and *_archive tables (>13 months) during backfill so that no record is missed or double-counted at the boundary.",
+        "preconditions": "Source contains records aged exactly 13 months and on either side of the boundary.",
+        "Expected Result": "Each record appears exactly once in the consolidated MLF_AIOps_*_Until<YYYYMMDD> table; boundary records are not duplicated or dropped.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Edge",
+        "steps": [
+            "Step 1: Seed records exactly at and around the 13-month boundary.",
+            "Step 2: Run backfill.",
+            "Step 3: Query consolidated table and validate single occurrence of each boundary record.",
+            "Step 4: Reconcile total counts against source union."
+        ],
+        "requirement_mapping": "Section 1.1 In Scope - One-Time Historical Backfill"
+    },
+    {
+        "test_id": "TC-035",
+        "test_name": "Daily batch with no source changes results in zero new rows",
+        "test_description": "Validate that when there are no new or updated records since the last batch run, the incremental pipeline completes successfully without loading any data and without errors.",
+        "preconditions": "No source changes between two consecutive runs.",
+        "Expected Result": "Pipeline runs successfully, loads 0 rows, advances or retains watermark appropriately, and logs a clear 'no new records' message.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Edge",
+        "steps": [
+            "Step 1: Complete a successful batch run.",
+            "Step 2: Make no changes to source data.",
+            "Step 3: Trigger next scheduled run.",
+            "Step 4: Verify zero rows loaded and clean run status."
+        ],
+        "requirement_mapping": "Section 1.5 Incremental Load Support"
+    },
+    {
+        "test_id": "TC-036",
+        "test_name": "Schema drift detection at source",
+        "test_description": "Validate that when the Moogsoft source schema changes unexpectedly (column added/removed/type changed), the pipeline detects the drift, raises an alert, and prevents corrupting Raw data.",
+        "preconditions": "Ability to modify schema in lower environment.",
+        "Expected Result": "Pipeline detects schema mismatch, halts loading or quarantines affected records, raises alert with details, and Raw table remains consistent.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Negative",
+        "steps": [
+            "Step 1: Add an unexpected column to a source table.",
+            "Step 2: Run pipeline.",
+            "Step 3: Verify drift is detected and handled per policy.",
+            "Step 4: Remove a required column and verify pipeline fails safely with alert."
+        ],
+        "requirement_mapping": "Section 1.5 Data Quality & Validation; Monitoring"
+    },
+    {
+        "test_id": "TC-037",
+        "test_name": "Configuration-driven onboarding of a new Moogsoft table",
+        "test_description": "Validate that a new Moogsoft table can be onboarded into the ingestion framework via configuration changes only, without significant code changes.",
+        "preconditions": "Framework supports configuration-driven onboarding; sample new table available.",
+        "Expected Result": "New table is ingested successfully after configuration update; no code deployment required beyond the configuration change.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Add new table definition to pipeline configuration.",
+            "Step 2: Deploy configuration update.",
+            "Step 3: Trigger pipeline.",
+            "Step 4: Verify new table data appears correctly in Landing and Raw layers."
+        ],
+        "requirement_mapping": "Section 1.5 Extensibility & Maintainability; Section 1.6 Maintainability & Extensibility"
+    },
+    {
+        "test_id": "TC-038",
+        "test_name": "Modification of ingestion schedule without redesign",
+        "test_description": "Validate that batch ingestion schedules can be modified (e.g., change 9 AM EST to a different time) through configuration without major redesign or downtime.",
+        "preconditions": "Scheduler exposes configuration; change management approved.",
+        "Expected Result": "New schedule is applied without breaking pipelines; pipelines run at new time on next cycle; previous schedule no longer triggers.",
+        "image_ref": "no",
+        "priority": "Low",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Update schedule configuration to a new time.",
+            "Step 2: Deploy and validate scheduler.",
+            "Step 3: Confirm runs occur at new time and not at old time."
+        ],
+        "requirement_mapping": "Section 1.6 Maintainability & Extensibility"
+    },
+    {
+        "test_id": "TC-039",
+        "test_name": "DEV vs PROD environment dataset naming and connectivity",
+        "test_description": "Validate that DEV and PROD pipelines connect to correct SQL Server endpoints and use correct table names (qa_* vs prod_*) per environment.",
+        "preconditions": "Environment-specific configurations deployed.",
+        "Expected Result": "DEV pipeline connects to esmretscacmoogsoft-sql.database.windows.net and reads qa_teams/qa_mtta/qa_mttd/qa_mttr; PROD pipeline connects to esmreprcacmoogsoft-sql.database.windows.net and reads prod_teams/prod_mtta/prod_mttd/prod_mttr; no cross-environment access occurs.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Integration",
+        "steps": [
+            "Step 1: Run DEV pipeline and inspect connection logs and table names.",
+            "Step 2: Run PROD pipeline and inspect connection logs and table names.",
+            "Step 3: Verify each environment hits only its intended endpoint and tables."
+        ],
+        "requirement_mapping": "Section 2.2 Source Connection Details; Section 2.3 Table names"
+    },
+    {
+        "test_id": "TC-040",
+        "test_name": "Event Hub consumer group and SPN configuration",
+        "test_description": "Validate that NRT ingestion uses the correct Event Hub namespace, server, topic (moogsoft-alerts-eh), $Default consumer group, and environment-specific SPN (gf-etsolive-dev for DEV, gf-etsolive-qa for QA).",
+        "preconditions": "Event Hub and SPN credentials provisioned per environment.",
+        "Expected Result": "Pipeline connects with the correct namespace/server/topic/consumer and SPN per environment; misconfiguration causes a clear connection error.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Integration",
+        "steps": [
+            "Step 1: Run NRT pipeline in DEV; verify connection params match esmretscaemoogsoftevnthb-ns and gf-etsolive-dev SPN.",
+            "Step 2: Run NRT pipeline in QA; verify gf-etsolive-qa SPN is used.",
+            "Step 3: Misconfigure consumer group; verify connection failure with clear error."
+        ],
+        "requirement_mapping": "Section 2.2 Event Hub connection details"
+    },
+    {
+        "test_id": "TC-041",
+        "test_name": "Raw layer datasets exposed to downstream Power BI",
+        "test_description": "Validate that Raw-layer Moogsoft datasets are accessible to downstream consumers such as Power BI, subject to access policies.",
+        "preconditions": "Power BI workspace configured; access roles applied.",
+        "Expected Result": "Authorized Power BI users can query and visualize Raw layer datasets; unauthorized users are denied; data freshness matches ingestion cadence.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Integration",
+        "steps": [
+            "Step 1: Connect Power BI to Raw layer datasets.",
+            "Step 2: Verify dataset visibility for authorized user.",
+            "Step 3: Confirm unauthorized user is blocked.",
+            "Step 4: Validate data freshness reflects latest ingestion."
+        ],
+        "requirement_mapping": "Section 1.3 Assumptions - Downstream Access; Section 1.5 Downstream Data Availability"
+    },
+    {
+        "test_id": "TC-042",
+        "test_name": "Data lineage and audit trail maintained",
+        "test_description": "Validate that complete data lineage and audit trails are maintained for all ingestion activities to satisfy governance and compliance requirements.",
+        "preconditions": "Lineage/audit tooling integrated with pipeline.",
+        "Expected Result": "Lineage shows source table -> Landing -> Raw mappings; audit logs capture who/what/when for every ingestion run; logs are retained per policy.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Security",
+        "steps": [
+            "Step 1: Execute a pipeline run.",
+            "Step 2: Inspect lineage tooling for end-to-end mapping.",
+            "Step 3: Verify audit log contains run identity, timestamps, datasets, and outcomes.",
+            "Step 4: Confirm retention policy compliance."
+        ],
+        "requirement_mapping": "Section 1.6 Compliance & Governance"
+    },
+    {
+        "test_id": "TC-043",
+        "test_name": "Out-of-scope curated/semantic transformation is not performed",
+        "test_description": "Validate that the ingestion pipelines do not perform transformations beyond what is needed for Raw-layer loading; no curated, semantic, or reporting modeling is produced.",
+        "preconditions": "Curated layer not provisioned for this project.",
+        "Expected Result": "Raw layer datasets retain source fidelity; no derived/aggregated tables are created by these pipelines; no Power BI semantic model is built by the ingestion project.",
+        "image_ref": "no",
+        "priority": "Low",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Inspect pipeline configuration and outputs.",
+            "Step 2: Confirm only Landing and Raw outputs exist.",
+            "Step 3: Verify no curated/semantic transformations are deployed."
+        ],
+        "requirement_mapping": "Section 1.2 Out of Scope"
+    },
+    {
+        "test_id": "TC-044",
+        "test_name": "Non-Moogsoft datasets are excluded from ingestion",
+        "test_description": "Validate that only Moogsoft-source tables are ingested and no non-Moogsoft data flows into Landing or Raw via these pipelines.",
+        "preconditions": "Pipeline configuration restricted to Moogsoft sources.",
+        "Expected Result": "Only Moogsoft tables listed in Section 2.3 are ingested; attempts to add non-Moogsoft sources via misconfiguration are blocked or fail validation.",
+        "image_ref": "no",
+        "priority": "Low",
+        "type": "Negative",
+        "steps": [
+            "Step 1: Review ingested dataset list and confirm Moogsoft-only.",
+            "Step 2: Attempt to configure a non-Moogsoft source.",
+            "Step 3: Verify the addition is rejected or flagged."
+        ],
+        "requirement_mapping": "Section 1.2 Out of Scope"
+    },
+    {
+        "test_id": "TC-045",
+        "test_name": "Future PII data detection triggers governance notification",
+        "test_description": "Validate that if any future PII/PHI data unexpectedly arrives from Moogsoft, the pipeline notifies the project and governance teams and pauses ingestion of affected datasets pending approval.",
+        "preconditions": "PII detection and notification workflow implemented.",
+        "Expected Result": "Synthetic PII record triggers detection, governance notification is sent, affected dataset ingestion is paused or quarantined, and resumption requires governance approval.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Security",
+        "steps": [
+            "Step 1: Inject a synthetic PII-like value into a test source field.",
+            "Step 2: Run pipeline.",
+            "Step 3: Verify detection, alert to governance team, and pipeline pause/quarantine.",
+            "Step 4: Confirm explicit approval workflow is required to resume."
+        ],
+        "requirement_mapping": "Section 1.6 Compliance & Governance"
+    },
+    {
+        "test_id": "TC-046",
+        "test_name": "Late-arriving NRT event with older last_state_change handled correctly",
+        "test_description": "Validate that when an NRT event arrives out of order with a last_state_change older than an existing open version, SCD2 logic does not corrupt the current version chain.",
+        "preconditions": "SCD2 implementation handles out-of-order events; sample late events available.",
+        "Expected Result": "Late event is either inserted as a historical version in correct chronological position or rejected per defined policy; current open version remains intact and only one version per key is current.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Edge",
+        "steps": [
+            "Step 1: Insert event v1 at T1, then v2 at T2 (T2 > T1).",
+            "Step 2: Emit late event v1.5 with last_state_change between T1 and T2.",
+            "Step 3: Query target SCD2 table.",
+            "Step 4: Verify chronological integrity and single open version."
+        ],
+        "requirement_mapping": "Section 1.5 Addendum - SCD Type 2 Versioning"
+    },
+    {
+        "test_id": "TC-047",
+        "test_name": "Duplicate NRT events with identical last_state_change are deduplicated",
+        "test_description": "Validate that duplicate NRT events for the same key with the same last_state_change value do not create duplicate SCD2 versions or duplicate rows in the streaming target.",
+        "preconditions": "SCD2 logic includes idempotency on (key, last_state_change).",
+        "Expected Result": "Only one row exists per (key, last_state_change); duplicates are ignored or treated as no-op.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Edge",
+        "steps": [
+            "Step 1: Emit the same event twice with identical last_state_change.",
+            "Step 2: Query the target table.",
+            "Step 3: Verify only one row exists for that (key, last_state_change) combination."
+        ],
+        "requirement_mapping": "Section 1.5 Addendum - SCD2; Data Quality"
+    },
+    {
+        "test_id": "TC-048",
+        "test_name": "Full fidelity preserved from source to Raw",
+        "test_description": "Validate that all data loaded into Landing and Raw layers retains full fidelity and accuracy from the source (no truncation, rounding, character encoding loss, or column drops).",
+        "preconditions": "Source contains a representative sample including special characters, large strings, max numeric values, and nullable columns.",
+        "Expected Result": "Raw layer rows exactly match source rows for all columns; checksum comparisons reconcile; no character encoding or precision loss.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Validation",
+        "steps": [
+            "Step 1: Seed source with diverse representative records.",
+            "Step 2: Run ingestion.",
+            "Step 3: Compare row-by-row and column-by-column between source and Raw.",
+            "Step 4: Verify zero discrepancies."
+        ],
+        "requirement_mapping": "Section 1.6 Data Quality"
+    },
+    {
+        "test_id": "TC-049",
+        "test_name": "Quarantine handling for malformed records",
+        "test_description": "Validate that invalid or malformed records are quarantined with appropriate logging that enables remediation rather than being silently dropped.",
+        "preconditions": "Quarantine destination configured.",
+        "Expected Result": "Malformed records appear in quarantine store with original payload, failure reason, run id, and timestamp; remediation team can replay or correct them.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Validation",
+        "steps": [
+            "Step 1: Inject malformed records into source.",
+            "Step 2: Run pipeline.",
+            "Step 3: Inspect quarantine store for required fields.",
+            "Step 4: Validate ability to reprocess after remediation."
+        ],
+        "requirement_mapping": "Section 1.6 Data Quality"
+    },
+    {
+        "test_id": "TC-050",
+        "test_name": "Backfill restart resumes without duplication",
+        "test_description": "Validate that if the one-time historical backfill is interrupted and restarted, it resumes correctly without producing duplicate rows in the consolidated Until<YYYYMMDD> tables.",
+        "preconditions": "Backfill pipeline supports restart/checkpointing.",
+        "Expected Result": "After interruption and restart, the consolidated table contains each source record exactly once; counts reconcile with source totals.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Edge",
+        "steps": [
+            "Step 1: Begin backfill.",
+            "Step 2: Interrupt mid-run (kill task).",
+            "Step 3: Restart backfill.",
+            "Step 4: Validate target table has no duplicates and row count matches source."
+        ],
+        "requirement_mapping": "Section 1.1 In Scope - One-Time Historical Backfill; Section 1.6 Availability & Reliability"
+    },
+    {
+        "test_id": "TC-051",
+        "test_name": "Application criticality 'Gold' SLA monitoring",
+        "test_description": "Validate that because Moogsoft is categorized as 'Gold', monitoring, alerting, and SLA enforcement align with Gold-tier requirements (e.g., 24x7 monitoring, rapid alerting, high-availability targets).",
+        "preconditions": "Monitoring tier configured to Gold.",
+        "Expected Result": "Pipeline observability and incident response thresholds meet Gold-tier requirements; alerts are routed to on-call channels.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Review monitoring/alerting configuration for Gold-tier SLAs.",
+            "Step 2: Simulate failure scenario.",
+            "Step 3: Validate alert routing and response timelines meet Gold-tier policy."
+        ],
+        "requirement_mapping": "Section 1.6 Application Criticality"
+    },
+    {
+        "test_id": "TC-052",
+        "test_name": "Scale test for future Moogsoft event frequency growth",
+        "test_description": "Validate that the pipeline accommodates a 2x-5x increase in NRT event frequency to confirm future scalability without breaching latency SLAs.",
+        "preconditions": "Load generator capable of emitting elevated NRT volumes to Event Hub.",
+        "Expected Result": "NRT pipeline sustains elevated load with latency remaining \u226460 seconds and no error rate increase beyond baseline.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Edge",
+        "steps": [
+            "Step 1: Establish baseline NRT throughput and latency.",
+            "Step 2: Increase emission rate to 2x.",
+            "Step 3: Increase emission rate to 5x.",
+            "Step 4: Measure latency and error rates and confirm SLA compliance."
+        ],
+        "requirement_mapping": "Section 1.6 Scalability & Throughput"
+    },
+    {
+        "test_id": "TC-053",
+        "test_name": "Alert and situation archive one-time copy via copy activity",
+        "test_description": "Validate that alert_archive and situation_archive are ingested via a one-time copy activity during initial load and are subsequently not re-copied by daily or NRT pipelines.",
+        "preconditions": "Archive tables populated; copy activity defined.",
+        "Expected Result": "alert_archive and situation_archive are copied once during initial load; no subsequent pipeline executes copy activity against them; their data is part of the Until<YYYYMMDD> tables only.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Execute initial-load copy activity for archive tables.",
+            "Step 2: Validate the data reflects in consolidated Until tables.",
+            "Step 3: Run NRT and daily batch multiple times.",
+            "Step 4: Confirm archive copy activity does not re-execute."
+        ],
+        "requirement_mapping": "Section 2.3 Table names (alert_archive/situation_archive - one-time copy activity)"
+    },
+    {
+        "test_id": "TC-054",
+        "test_name": "Open Questions - missing information not addressed",
+        "test_description": "Document open questions discovered while reviewing the BRD: (1) exact retention period for logs; (2) defined retry counts/backoff for transient failures; (3) PROD Event Hub connection details (left blank in BRD section 2.2); (4) specific operational SLA window length for daily batch completion; (5) policy for handling late-arriving NRT events (insert vs reject); (6) Power BI access role definitions. These should be clarified by stakeholders before final test execution.",
+        "preconditions": "N/A - documentation gap tracker.",
+        "Expected Result": "All open questions are addressed by business/technical stakeholders and the requirements/tests are updated accordingly.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Functional",
+        "steps": [
+            "Step 1: Circulate open questions list to stakeholders.",
+            "Step 2: Capture answers and update BRD.",
+            "Step 3: Update or add test cases to cover newly clarified requirements."
+        ],
+        "requirement_mapping": null
+    }
+]

@@ -1,0 +1,329 @@
+[
+    {
+        "Req_id": "Moogsoft_BRD_v4.1.3",
+        "Req_Analysis_Result": "INCOMPLETE_FOR_QA",
+        "Req_Analysis_Score": "5",
+        "Req_Analysis_Result_Details": [
+            {
+                "Observation": "Source-to-Target Mapping (STM) is not embedded in BRD; schema, column-level data types, nullability, PK/FK, and watermark column names for alert/situation/qa_mtta/qa_mttd/qa_mttr/qa_teams/onboardedTeams are referenced only via external attachment (Moogsoft_SQL_Schema.xlsx). QA cannot author ETL field-level test cases without these mappings.",
+                "Category": "stm",
+                "Severity": "blocker",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'Appendix > Attachments' > Page 13",
+                "Questions": [
+                    {
+                        "question-1": "What is the exact source-to-target column mapping for each in-scope table (source column, target column, data type, length, nullability, transformation rule)?",
+                        "question-2": "Which specific column is the watermark for alert, situation, qa_mtta, qa_mttd, qa_mttr (e.g., last_state_change, modified_dt)?",
+                        "question-3": "What are the primary keys / business keys for each target table in Landing and Raw layers?",
+                        "question-4": "Are there any source columns to be excluded/renamed/derived during Landing-to-Raw movement?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Backfill cutoff date token <YYYYMMDD> is undefined. QA cannot determine the boundary value separating historical (MLF_AIOps_*_Until<YYYYMMDD>) from streaming (MLF_AIOps_*_Streaming) datasets, nor validate the join view used by downstream consumers.",
+                "Category": "ambiguity",
+                "Severity": "high",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.1 In Scope > One-Time Historical Backfill' > Page 5",
+                "Questions": [
+                    {
+                        "question-1": "What is the actual cutoff date (<YYYYMMDD>) to be used for the backfill snapshot for DEV and PROD?",
+                        "question-2": "How will the cutoff be documented/communicated and is it identical for alert and situation datasets?",
+                        "question-3": "What is the expected behavior if a record's timestamp equals the cutoff date exactly (inclusive vs exclusive)?",
+                        "question-4": "How should QA validate the deduplication boundary between *_Until<YYYYMMDD> and *_Streaming tables?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Active vs archive boundary (13 months) is defined logically but no rule is given for what happens when an active record crosses the 13-month threshold post-backfill (does it auto-move to archive? remains in active? duplicated?).",
+                "Category": "gap",
+                "Severity": "high",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.1 In Scope > One-Time Historical Backfill' > Page 5",
+                "Questions": [
+                    {
+                        "question-1": "After backfill, how is the rolling 13-month active/archive boundary maintained in Moogsoft source vs EDL?",
+                        "question-2": "Does EDL ever re-ingest archive data, or is the one-time backfill considered final?",
+                        "question-3": "Is the 13-month boundary based on created_at, last_state_change, or another column?"
+                    }
+                ]
+            },
+            {
+                "Observation": "NRT latency requirement is stated as \u226460s end-to-end and ~5s ingestion cycles, but no measurement points are defined (event timestamp at Moogsoft? Event Hub enqueue? Landing write? Raw write? Power BI refresh?). QA cannot design or measure latency SLA tests without clear start/end markers.",
+                "Category": "ambiguity",
+                "Severity": "high",
+                "Req_type": "Pipeline",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.6 NonFunctional Requirements > Performance & Latency' > Page 9",
+                "Questions": [
+                    {
+                        "question-1": "What are the exact start and end measurement points for the 60-second end-to-end latency SLA?",
+                        "question-2": "What percentile (p50/p95/p99) must the 60s SLA meet, and over what observation window?",
+                        "question-3": "What is the acceptable tolerance/jitter for the 5-second ingestion cycle?",
+                        "question-4": "What is the expected behavior and alerting threshold when latency exceeds 60s?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Throughput, peak event rate, concurrent user load, and TPS/TPM are not quantified. Only total data volume (~12\u201313 GB) is given for backfill, with no peak EPS for alerts/situations or growth projections.",
+                "Category": "missing",
+                "Severity": "high",
+                "Req_type": "Pipeline",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.6 NonFunctional Requirements > Scalability & Throughput' > Page 9",
+                "Questions": [
+                    {
+                        "question-1": "What is the average and peak events-per-second for alert and situation NRT streams?",
+                        "question-2": "What is the expected daily/monthly growth rate of Moogsoft volume?",
+                        "question-3": "What is the expected row count and size for each batch table per day?",
+                        "question-4": "How many concurrent downstream Power BI consumers must the Raw layer support?"
+                    }
+                ]
+            },
+            {
+                "Observation": "SCD Type 2 implementation rules are partially defined. Behavior is not specified for out-of-order events, duplicate last_state_change values, late-arriving events, or null last_state_change. Edge cases for closing previous version when current End_AT > new last_state_change are not covered.",
+                "Category": "gap",
+                "Severity": "high",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.5 Functional Requirements > Addendum \u2013 SCD Type 2' > Page 8",
+                "Questions": [
+                    {
+                        "question-1": "How should the pipeline handle out-of-order events (newer event arrives before older event)?",
+                        "question-2": "What is the behavior when two events share the same last_state_change timestamp?",
+                        "question-3": "How are NULL or missing last_state_change values handled?",
+                        "question-4": "Is there an Is_Current/active-flag column and how is it maintained?",
+                        "question-5": "What is the rule when a delete event is received (soft delete vs hard delete vs ignore)?"
+                    }
+                ]
+            },
+            {
+                "Observation": "System-generated fields insertDT, db_alert_id, db_situation_id are required but generation algorithm, datatype, timezone, uniqueness scope (per-record / per-version), and collision handling are not specified.",
+                "Category": "missing",
+                "Severity": "high",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.5 Functional Requirements > Addendum \u2013 System-Generated Fields' > Page 8",
+                "Questions": [
+                    {
+                        "question-1": "What is the data type, format, and timezone for insertDT (e.g., UTC timestamp, ISO 8601)?",
+                        "question-2": "What algorithm generates db_alert_id and db_situation_id (UUID, sequence, hash of source key)?",
+                        "question-3": "Are db_alert_id/db_situation_id unique per source record or per SCD-2 version row?",
+                        "question-4": "How are id collisions or regenerated ids on reprocessing handled (idempotency)?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Missing source attributes from Event Hub path are mentioned but the actual list of missing columns, their target column names, derivation logic, and source-of-truth for each are not enumerated.",
+                "Category": "missing",
+                "Severity": "high",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.4 Constraints > Missing attributes from Source' > Page 7",
+                "Questions": [
+                    {
+                        "question-1": "Which specific columns are missing from Event Hub vs SQL Server source?",
+                        "question-2": "What is the derivation/default logic for each missing column in the EDL Raw layer?",
+                        "question-3": "How will QA validate parity between Event Hub-derived and SQL-Server-derived records?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Data validation rules for 'schema conformity, expected data types, and required fields' are stated at a high level but no concrete rules per column (acceptable enumerations, regex patterns, ranges, mandatory fields) are provided. Rejection vs quarantine policy is also ambiguous ('either rejected or quarantined').",
+                "Category": "ambiguity",
+                "Severity": "high",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.5 Functional Requirements > Data Quality & Validation' > Page 8",
+                "Questions": [
+                    {
+                        "question-1": "What is the per-column validation rule set (mandatory, datatype, range, allowed values)?",
+                        "question-2": "Under what conditions are records rejected vs quarantined?",
+                        "question-3": "Where are rejected/quarantined records stored, and what is the remediation/reprocessing workflow?",
+                        "question-4": "What is the acceptable data quality threshold (e.g., % bad records) before pipeline fails?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Error handling and recovery requirements are vague. Retry counts, backoff strategy, dead-letter queue, rollback semantics for partial Landing/Raw writes, and idempotency keys are not specified.",
+                "Category": "missing",
+                "Severity": "high",
+                "Req_type": "Pipeline",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.6 NonFunctional Requirements > Availability & Reliability' > Page 9",
+                "Questions": [
+                    {
+                        "question-1": "What is the retry policy (number of retries, backoff interval) for transient failures?",
+                        "question-2": "Is there a dead-letter destination for poison messages from Event Hub?",
+                        "question-3": "How is idempotency guaranteed when an NRT batch is reprocessed (duplicate prevention)?",
+                        "question-4": "What is the rollback or compensating action if Landing succeeds but Raw write fails?",
+                        "question-5": "What is the RTO/RPO for the NRT and batch pipelines?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Alerting requirements are listed (failures, schema mismatch, latency) but no thresholds, severity levels, notification channels, on-call routing, or escalation matrix are defined.",
+                "Category": "missing",
+                "Severity": "medium",
+                "Req_type": "Pipeline",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.6 NonFunctional Requirements > Observability & Monitoring' > Page 10",
+                "Questions": [
+                    {
+                        "question-1": "What thresholds trigger latency, failure, and DQ alerts?",
+                        "question-2": "What channels (email/Teams/PagerDuty) and severity levels apply?",
+                        "question-3": "What is the log retention period and storage location?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Security requirement states 'Any PII Data must be encrypted in transit and at rest' yet the BRD elsewhere asserts no PII/PHI is in scope. The contradiction makes test scope for encryption/PII handling unclear.",
+                "Category": "ambiguity",
+                "Severity": "medium",
+                "Req_type": "General",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.6 NonFunctional Requirements > Security' > Page 9",
+                "Questions": [
+                    {
+                        "question-1": "Is encryption-at-rest/in-transit required for all data or only PII (which is supposedly absent)?",
+                        "question-2": "What is the approved encryption standard (TLS version, AES key length)?",
+                        "question-3": "What is the SPN least-privilege role definition for ingestion vs read access?",
+                        "question-4": "Is there a PII scan/discovery control to detect accidental PII ingestion?"
+                    }
+                ]
+            },
+            {
+                "Observation": "PROD Event Hub connection details are blank in the BRD (only DEV details listed). QA cannot prepare PROD-tier integration/connectivity tests.",
+                "Category": "missing",
+                "Severity": "high",
+                "Req_type": "Pipeline",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'2.2 Source Connection Details > Prod' > Page 11",
+                "Questions": [
+                    {
+                        "question-1": "What are the PROD Event Hub namespace, server, topic, consumer group, and SPN?",
+                        "question-2": "Are DEV and QA environments fully isolated from PROD Event Hub?",
+                        "question-3": "Is there a dedicated QA environment endpoint, or do QA tests run against DEV?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Test environment, test data refresh strategy, data masking approach, and volume-test data preparation strategy are not addressed. There is no entry/exit criteria or test data plan for QA.",
+                "Category": "missing",
+                "Severity": "high",
+                "Req_type": "General",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1. Requirements' > Page 5",
+                "Questions": [
+                    {
+                        "question-1": "Which environment (DEV/QA) will be used for functional and performance testing?",
+                        "question-2": "How will representative NRT and historical test data be provisioned and refreshed?",
+                        "question-3": "Are there entry/exit criteria for promoting the pipeline through environments?",
+                        "question-4": "Is there an approach for synthesizing peak-load events to validate the 5s/60s SLA?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Daily batch trigger is fixed at 9 AM EST but no SLA window (latest acceptable completion time), failure-recovery rerun policy, or behavior on missed/late triggers is defined.",
+                "Category": "gap",
+                "Severity": "medium",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.1 In Scope > Daily Batch Ingestion' > Page 5",
+                "Questions": [
+                    {
+                        "question-1": "What is the latest acceptable completion time for the 9 AM EST batch?",
+                        "question-2": "If the 9 AM run fails, when is the rerun scheduled and is catch-up automatic?",
+                        "question-3": "What is the behavior if two daily runs overlap?",
+                        "question-4": "Does the watermark advance only on successful end-to-end completion?"
+                    }
+                ]
+            },
+            {
+                "Observation": "State management for NRT records (e.g., alert lifecycle: open \u2192 acknowledged \u2192 resolved \u2192 closed) and valid/invalid transitions are not documented. QA cannot build state-transition test cases for SCD-2 versioning.",
+                "Category": "missing",
+                "Severity": "medium",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.5 Functional Requirements > Addendum' > Page 8",
+                "Questions": [
+                    {
+                        "question-1": "What are the valid lifecycle states for an alert and a situation?",
+                        "question-2": "Which state transitions are valid/invalid, and how are invalid transitions handled?",
+                        "question-3": "Should closed/resolved alerts continue to receive updates in the streaming table?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Versioning strategy for the ingestion pipeline (schema evolution, backward compatibility when Moogsoft adds/removes columns, contract changes with Event Hub producers) is not defined.",
+                "Category": "missing",
+                "Severity": "medium",
+                "Req_type": "Pipeline",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.6 NonFunctional Requirements > Maintainability & Extensibility' > Page 10",
+                "Questions": [
+                    {
+                        "question-1": "How are schema changes from Moogsoft source handled (auto-evolve, fail, manual)?",
+                        "question-2": "Is there a contract/version pinning for Event Hub event schema?",
+                        "question-3": "What is the backward-compatibility expectation for downstream Power BI consumers?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Deployment, environment configuration, feature flags, and config-driven runtime parameters (e.g., watermark column overrides, batch window) are referenced as 'configuration-driven' but not enumerated. QA cannot test config switches without their list and valid value ranges.",
+                "Category": "missing",
+                "Severity": "medium",
+                "Req_type": "Pipeline",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.6 NonFunctional Requirements > Maintainability & Extensibility' > Page 10",
+                "Questions": [
+                    {
+                        "question-1": "What configuration parameters are exposed for the pipeline and what are their valid ranges/defaults?",
+                        "question-2": "Are there feature flags for enabling/disabling NRT vs batch ingestion?",
+                        "question-3": "How are config changes deployed and audited?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Reconciliation rules between source (SQL Server / Event Hub) and target (Landing/Raw) are not defined. No control totals, row-count checks, hash comparisons, or NRT-vs-batch overlap reconciliation are documented.",
+                "Category": "missing",
+                "Severity": "high",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.5 Functional Requirements > Data Quality & Validation' > Page 8",
+                "Questions": [
+                    {
+                        "question-1": "What reconciliation controls (row counts, checksums, business key counts) compare source to Raw?",
+                        "question-2": "How is overlap between *_Until<YYYYMMDD> and *_Streaming reconciled to detect gaps/duplicates?",
+                        "question-3": "What is the tolerance threshold for reconciliation mismatches before raising an alert?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Downstream dependency on Power BI is mentioned but no contract (refresh frequency, dataset model, semantic-layer expectations) or SLA agreement with the Power BI team is documented. Dashboard validation is out of scope but data-delivery contract is unclear.",
+                "Category": "gap",
+                "Severity": "medium",
+                "Req_type": "Integration",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'1.5 Functional Requirements > Downstream Data Availability' > Page 8",
+                "Questions": [
+                    {
+                        "question-1": "Is there a data-delivery contract / SLA agreed with the Power BI team?",
+                        "question-2": "What read pattern (DirectQuery vs Import) does Power BI use against the Raw layer?",
+                        "question-3": "What downstream consumers besides Power BI exist (ETS, GOCC, Observability)?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Source Data Availability section lists 'Current date upto 13 months' for both DEV and PROD but no explicit earliest available timestamp / row count baselines are given. The section heading promises 'earliest available records' but actual dates are absent.",
+                "Category": "missing",
+                "Severity": "medium",
+                "Req_type": "ETL/ELT",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'2.1 Source Data Availability' > Page 11",
+                "Questions": [
+                    {
+                        "question-1": "What are the exact earliest available record timestamps for alert/situation/alert_archive/situation_archive in DEV and PROD?",
+                        "question-2": "What are the approximate row counts for each source table at backfill cutoff?"
+                    }
+                ]
+            },
+            {
+                "Observation": "Attachments (OAR_DB_Inventory_V1.xlsx, Moogsoft_SQL_Schema.xlsx, Moogsoft_Architecture_Diagram) are referenced but not provided/embedded. Critical schema and load-strategy details required for QA test design are external.",
+                "Category": "missing",
+                "Severity": "blocker",
+                "Req_type": "General",
+                "Location": "Moogsoft BRD v4.1.3.docx > \u00a7'2.4 Attachments' > Page 13",
+                "Questions": [
+                    {
+                        "question-1": "Can the OAR_DB_Inventory and Moogsoft_SQL_Schema spreadsheets be shared for QA review?",
+                        "question-2": "Where is the architecture diagram (referenced page is empty)?",
+                        "question-3": "Are there any additional attachments (mapping docs, API specs for qa_teams) not listed?"
+                    }
+                ]
+            }
+        ]
+    }
+]

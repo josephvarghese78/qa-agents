@@ -1,0 +1,273 @@
+[
+    {
+        "plan_id": "TP-001",
+        "section_name": "Scope, Objectives & Boundaries",
+        "description": "Establishes the strategic test scope for the Moogsoft Ingestion to Enterprise Data Lake (EDL) initiative. In-scope coverage includes: (a) one-time historical backfill for alerts, situations, alert_archive, and situation_archive into MLF_AIOps_Alert_Until<YYYYMMDD> and MLF_AIOps_Situation_Until<YYYYMMDD>; (b) daily batch ingestion for qa_teams, qa_mtta, qa_mttr, qa_mttd (incremental) and onboardedTeams (full load) triggered at 9 AM EST; (c) NRT streaming ingestion for alerts and situations writing to MLF_AIOps_Alert_Streaming and MLF_AIOps_Situation_Streaming with ~5-second cycles and \u226460-second end-to-end latency. Out-of-scope items (Curated/Semantic/Reporting layer transformations, Power BI dashboard or model design, non-Moogsoft datasets) are explicitly excluded from QA validation to prevent scope creep and to focus risk on Landing and Raw layer fidelity. Dataset separation between historical *_Until<YYYYMMDD> and *_Streaming datasets must be enforced and verified (no unification post-backfill).",
+        "preconditions": "BRD v4.1.3 signed off by approval stakeholders; In-Scope/Out-of-Scope sections endorsed by Business (Jason Andrews) and Architecture (Sahil Nagpal, Sandeep Singh, Jeffrey Hua); finalized dataset list for DEV and PROD as per Appendix.",
+        "Expected Result": "A QA-approved Scope Traceability Matrix mapping each In-Scope ingestion pattern (backfill, batch, NRT) to dataset, target table, load type, and validation owner, with explicit Out-of-Scope exclusions documented and acknowledged by sign-off.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Strategic Setup",
+        "steps": [
+            "Step 1: Extract every In-Scope dataset (alerts, situations, alert_archive, situation_archive, qa_teams, qa_mtta, qa_mttr, qa_mttd, onboardedTeams) and map to its target Landing/Raw table and load pattern.",
+            "Step 2: Catalog Out-of-Scope items (Curated/Semantic layer, Power BI modeling, non-Moogsoft sources) into an exclusion register with rationale.",
+            "Step 3: Circulate the scope matrix to Business and Technology stakeholders listed in the BRD for formal sign-off prior to test execution kickoff.",
+            "Step 4: Lock the scope baseline in the test management tool and require a formal change-request for any post-baseline scope additions."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Requirements > In Scope / Out of Scope"
+    },
+    {
+        "plan_id": "TP-002",
+        "section_name": "Environment, Architecture & Platform Delimiters",
+        "description": "Defines the target environment topology required to validate the ingestion pipeline across DEV, QA, and PROD. Source systems are Azure SQL (esmretscacmoogsoft-sql.database.windows.net for DEV and esmreprcacmoogsoft-sql.database.windows.net for PROD) using database 'Moogsoft' and Event Hub namespace 'esmretscaemoogsoftevnthb-ns' with topic 'moogsoft-alerts-eh' (consumer group $Default). Target layers are EDL Landing and Raw only. All Windows-based pipeline development artifacts, configuration files, and ADF/Databricks deployment scripts must use Windows-style backslash directory conventions (e.g., C:\\edl\\moogsoft\\configs\\). The Architecture Diagram in the BRD Attachments section illustrates the SQL Server + Event Hub \u2192 Landing \u2192 Raw flow consumed downstream by Power BI; this diagram is the canonical reference for environment provisioning verification.",
+        "preconditions": "DEV/QA/PROD Azure SQL endpoints reachable; Event Hub namespaces provisioned; EDL Landing and Raw layers provisioned per Assumptions section; SPNs gf-etsolive-dev and gf-etsolive-qa active; firewall and private endpoint connectivity validated.",
+        "Expected Result": "Environment Readiness Checklist signed off confirming all three environments (DEV/QA/PROD analogs) reflect the BRD Architecture Diagram, with documented SQL endpoints, Event Hub topics, consumer groups, and SPN bindings for each.",
+        "image_ref": "yes",
+        "priority": "High",
+        "type": "Strategic Setup",
+        "steps": [
+            "Step 1: Validate connectivity from EDL compute to each SQL server endpoint (DEV: esmretscacmoogsoft-sql.database.windows.net; PROD: esmreprcacmoogsoft-sql.database.windows.net) using designated SPNs.",
+            "Step 2: Confirm Event Hub namespace 'esmretscaemoogsoftevnthb-ns', topic 'moogsoft-alerts-eh', and $Default consumer group are accessible from QA ingestion runners.",
+            "Step 3: Verify the Landing and Raw EDL layers are provisioned and writable, and that Windows-style backslash directory paths in configuration files resolve correctly on Windows-based orchestration agents.",
+            "Step 4: Cross-reference live environment topology against the Architecture Diagram attached to the BRD and remediate any drift before opening QA execution."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Appendix > Source Connection Details; Attachments > Architecture Diagram"
+    },
+    {
+        "plan_id": "TP-003",
+        "section_name": "Historical Backfill Validation Strategy",
+        "description": "Defines QA strategy for the one-time historical backfill of alerts, situations, alert_archive, and situation_archive datasets. Active alert/situation tables contain data <13 months old; archive tables retain data >13 months. Post-backfill, historical alert data must be consolidated into MLF_AIOps_Alert_Until<YYYYMMDD> (pk_id: alert_id) and historical situation data into MLF_AIOps_Situation_Until<YYYYMMDD> (pk_id: situation_id). The <YYYYMMDD> token represents the cutoff date. QA must confirm these consolidated datasets are not subsequently refreshed or re-ingested, and that they remain logically and physically separate from *_Streaming datasets. Join-view scenarios (JOIN of MLF_AIOps_Alert_Until<YYYYMMDD> + MLF_AIOps_Alert_Streaming) must be validated for completeness when use cases require pre-cutoff data.",
+        "preconditions": "Backfill cutoff date <YYYYMMDD> agreed by Business Analyst (Nanda Kishore Gowravaram) and Lead Data Engineer (Avinash Repe); source row counts captured at cutoff; backup of source state documented.",
+        "Expected Result": "Reconciled record counts and checksums between SQL Server source archives and the consolidated MLF_AIOps_*_Until<YYYYMMDD> targets, with verified pk_id uniqueness (alert_id, situation_id) and confirmation of no post-backfill re-ingestion runs.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional Validation",
+        "steps": [
+            "Step 1: Capture pre-backfill source row counts, min/max timestamps, and column hashes for alerts, situations, alert_archive, and situation_archive at the <YYYYMMDD> cutoff.",
+            "Step 2: Execute backfill and validate consolidation into MLF_AIOps_Alert_Until<YYYYMMDD> and MLF_AIOps_Situation_Until<YYYYMMDD> with full-fidelity row, schema, and primary key (alert_id, situation_id) verification.",
+            "Step 3: Verify that the historical Until<YYYYMMDD> tables are immutable (no further inserts/updates after cutoff) by monitoring for change events over a sustained observation window.",
+            "Step 4: Validate join correctness between Until<YYYYMMDD> and *_Streaming datasets for representative pre/post-cutoff use cases to ensure no record loss or duplication at the boundary."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - In Scope > One-Time Historical Backfill; Functional Requirements > Historical Backfill & Dataset Unification"
+    },
+    {
+        "plan_id": "TP-004",
+        "section_name": "Daily Batch Ingestion Validation",
+        "description": "Validates the daily batch ingestion pipeline for qa_teams, qa_mtta, qa_mttr, qa_mttd (incremental, watermark-based) and onboardedTeams (full-load). Pipelines are scheduled at 9 AM EST and must capture only new/updated records (excluding historical reloads) for the four incremental tables, while onboardedTeams must replace its contents in full each day. QA must verify watermark column behavior, schedule adherence, completion within the operational window, and source-system performance protection (ingestion must not degrade production SQL Server).",
+        "preconditions": "Watermark column metadata supplied by Moogsoft source team; ADF/Databricks job schedules deployed; service principal access verified; baseline dataset snapshots taken in source for delta comparison.",
+        "Expected Result": "Each daily batch run completes within the 9 AM EST operational window, ingests only deltas for qa_* tables, performs full replacement for onboardedTeams, and produces zero rejected records under nominal conditions with run-time metadata logged.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional Validation",
+        "steps": [
+            "Step 1: Trigger scheduled batch run at 9 AM EST in QA and validate watermark advancement for qa_teams, qa_mtta, qa_mttr, qa_mttd against source max(watermark).",
+            "Step 2: Confirm onboardedTeams is loaded in full-fidelity mode each day with prior-day data replaced entirely.",
+            "Step 3: Inject test deltas (new and updated rows) into source the prior evening and verify only the deltas propagate to Landing and Raw the next morning.",
+            "Step 4: Measure source SQL Server CPU/IO impact during ingestion to confirm production protection thresholds are not breached."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - In Scope > Daily Batch Ingestion; Functional Requirements > Ingestion Capabilities"
+    },
+    {
+        "plan_id": "TP-005",
+        "section_name": "Near Real-Time (NRT) Streaming Ingestion Validation",
+        "description": "Validates the dedicated NRT pipeline ingesting alert and situation events from Event Hub topic 'moogsoft-alerts-eh' (consumer $Default) into MLF_AIOps_Alert_Streaming and MLF_AIOps_Situation_Streaming. NRT must process inserts and updates only (no historical reloads), operate on ~5-second ingestion cycles, and maintain \u226460-second end-to-end latency to downstream consumers such as Power BI. QA also validates the SCD Type 2 versioning logic driven by the source last_state_change timestamp (close prior version End_AT = last_state_change; insert new version Start_AT = last_state_change) and the system-generated fields insertDT, db_alert_id, db_situation_id introduced in the Addendum.",
+        "preconditions": "Event Hub topic actively receiving events; SPN gf-etsolive-qa authorized; Raw layer streaming sinks created; latency measurement instrumentation deployed end-to-end.",
+        "Expected Result": "Sustained ingestion at ~5-second cadence with measured end-to-end latency \u226460 seconds across 24-hour soak; SCD2 history correctly maintained via last_state_change; insertDT, db_alert_id, db_situation_id populated for every record; no historical reload triggered.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Integration & Performance",
+        "steps": [
+            "Step 1: Publish synthetic alert and situation events to 'moogsoft-alerts-eh' and measure ingestion-to-Raw latency at the p50, p95, and p99 percentiles over a 24-hour observation window.",
+            "Step 2: Issue an update event for an existing alert/situation and verify the prior row is closed (End_AT = last_state_change) and a new row inserted (Start_AT = last_state_change).",
+            "Step 3: Validate that insertDT, db_alert_id, and db_situation_id are system-generated and non-null on every streamed record.",
+            "Step 4: Confirm the NRT pipeline runs independently of backfill and batch pipelines and never triggers a historical reload during failover or restart.",
+            "Step 5: Simulate transient Event Hub disconnection and validate automatic recovery and watermark resumption without data loss or duplication."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - In Scope > NRT/Streaming Ingestion; Functional Requirements > NRT (Separate Pipeline); Addendum > SCD Type 2 and System-Generated Fields; NFR > Performance & Latency"
+    },
+    {
+        "plan_id": "TP-006",
+        "section_name": "Data Quality, Schema & PII/PHI Compliance Validation",
+        "description": "Defines QA strategy to validate schema conformity, expected data types, required-field presence, full-fidelity preservation from source to Raw, and the strict prohibition of PII/PHI in any Moogsoft dataset. Invalid or malformed records must be rejected or quarantined with logging, and any future detection of PII/PHI must immediately trigger notification to the governance team per BRD Compliance & Governance constraints.",
+        "preconditions": "Approved source-to-target schema mappings published; data dictionary and reference field-type catalog signed off; quarantine/rejection table provisioned in Raw layer; governance escalation path documented.",
+        "Expected Result": "All ingested records pass schema validation, data-type enforcement, and required-field checks; zero PII/PHI fields detected via automated scans; malformed test records are correctly rejected with full traceable log entries.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Functional Validation",
+        "steps": [
+            "Step 1: Execute schema-conformity tests across all in-scope datasets comparing source DDL to Landing and Raw target schemas.",
+            "Step 2: Inject malformed records (wrong types, missing required fields, oversized payloads) and verify they are rejected/quarantined with logged validation failures.",
+            "Step 3: Run automated PII/PHI scanners on Landing and Raw datasets and confirm zero findings; raise governance escalation procedure dry-run.",
+            "Step 4: Reconcile source vs. Raw row counts, column hashes, and null distributions to confirm full-fidelity ingestion."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Functional Requirements > Data Quality & Validation; Constraints > Data Privacy; NFR > Compliance & Governance / Data Quality"
+    },
+    {
+        "plan_id": "TP-007",
+        "section_name": "Security, SPN-Based Access Control & Encryption Validation",
+        "description": "Validates that all ingestion pipelines authenticate exclusively via approved Service Principals (gf-etsolive-dev for DEV, gf-etsolive-qa for QA, and the equivalent PROD SPN), enforce least-privilege access, and protect data in transit and at rest. Access to Landing and Raw Moogsoft datasets must be limited to authorized users and services per platform-approved security roles. Credentials must never appear in pipeline configurations or logs.",
+        "preconditions": "SPNs provisioned and registered with appropriate role assignments; key vault entries for secrets configured; enterprise security policy baseline available for comparison.",
+        "Expected Result": "All pipeline authentication confirmed to use SPNs only; unauthorized access attempts denied with audit trail; encryption in transit (TLS) and at rest verified on all storage and connection paths; zero secrets found in code or config repositories.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Security & Access Control",
+        "steps": [
+            "Step 1: Inspect every pipeline activity (batch, NRT, backfill) and confirm SPN-based authentication; reject any usage of personal accounts or static credentials.",
+            "Step 2: Attempt access from an unauthorized identity to Landing and Raw datasets and confirm access is denied with an audit log entry produced.",
+            "Step 3: Validate TLS enforcement on connections to SQL Server endpoints and Event Hub namespace, and storage-level encryption at rest on EDL layers.",
+            "Step 4: Run a secrets-scanner across pipeline code and configuration to verify no hardcoded credentials or connection strings are present."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Functional Requirements > Security & Controlled Access; Constraints > Security & Access Control; NFR > Security"
+    },
+    {
+        "plan_id": "TP-008",
+        "section_name": "Observability, Monitoring & Error Handling Validation",
+        "description": "Validates that all ingestion activities (extraction, validation, load) are logged with timestamps, error descriptions, and run metadata; that alerts are generated for ingestion failures, schema mismatches, latency breaches in the NRT pipeline, and data-quality errors; and that operational dashboards reflect job status, NRT latency, error rates, and validation metrics in real time. Log retention must satisfy audit requirements.",
+        "preconditions": "Monitoring stack (alerts, dashboards, log aggregation) provisioned; on-call rotation defined; SLO thresholds for NRT latency (\u226460s) and batch completion window agreed.",
+        "Expected Result": "Every ingestion run produces complete log and metadata records; simulated failures (schema mismatch, latency breach, source unavailability) generate alerts within agreed MTTD; dashboards render accurate real-time status across all pipelines.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Integration & Performance",
+        "steps": [
+            "Step 1: Trigger controlled failures (invalid schema, source disconnect, NRT delay >60s) and verify alerts are generated and routed to the correct on-call channels.",
+            "Step 2: Validate that every pipeline run logs extraction, validation, and load events with timestamps and run identifiers.",
+            "Step 3: Verify dashboards display real-time job status, NRT latency percentiles, error rates, and validation metrics for all pipelines.",
+            "Step 4: Confirm log retention configuration aligns with enterprise audit requirements."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Functional Requirements > Monitoring, Logging, and Error Handling; NFR > Observability & Monitoring"
+    },
+    {
+        "plan_id": "TP-009",
+        "section_name": "Performance, Scalability & Reliability Validation",
+        "description": "Validates that the ingestion solution meets non-functional performance benchmarks: NRT pipeline delivers alert/situation data within \u226460 seconds; ingestion cycles operate at ~5 seconds; batch refresh completes within the 9 AM EST window; the solution sustains the current ~12\u201313 GB Moogsoft dataset volume and scales for future growth; transient failures auto-recover without manual intervention; and run-time metadata reliably records success/failure status. Moogsoft is classified as a 'Gold' criticality application, raising the bar for availability.",
+        "preconditions": "Performance test harness available with synthetic event generators; baseline metrics captured; chaos/fault-injection tooling available for reliability tests.",
+        "Expected Result": "Sustained NRT latency \u226460 seconds at projected and 2x peak load; full historical backfill of 12\u201313 GB completes within agreed window; transient failure injection demonstrates automatic recovery with no data loss; Gold-tier availability targets met.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Integration & Performance",
+        "steps": [
+            "Step 1: Run a sustained load test publishing alert/situation events at projected and 2x peak rates; confirm \u226460s end-to-end latency and ~5s ingestion cadence.",
+            "Step 2: Execute a full backfill of the 12\u201313 GB historical dataset and capture end-to-end timing, resource utilization, and completion success.",
+            "Step 3: Inject transient faults (network drop, Event Hub throttling, SQL timeout) and validate automatic recovery without operator action.",
+            "Step 4: Validate run-time metadata accurately reflects success/failure across NRT and batch pipelines under load."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - NFR > Performance & Latency / Scalability & Throughput / Availability & Reliability / Application Criticality"
+    },
+    {
+        "plan_id": "TP-010",
+        "section_name": "Downstream Data Availability & Power BI Consumption Validation",
+        "description": "Validates that Raw-layer Moogsoft datasets are accessible to downstream consumers (notably Power BI) under enterprise data access policies, and that NRT alert/situation data is queryable downstream within the 60-second latency SLA. Note: Power BI dashboard development and semantic modeling are Out-of-Scope; only data availability and accessibility are validated here.",
+        "preconditions": "Raw-layer access policies configured for downstream service principals; Power BI gateway/connector reachable in QA; sample consumer queries provided by downstream owners.",
+        "Expected Result": "Authorized downstream services successfully query Raw Moogsoft datasets; NRT-streamed records are discoverable downstream within 60 seconds of source event time.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Integration & Performance",
+        "steps": [
+            "Step 1: Execute representative downstream read queries against Raw Moogsoft datasets via authorized SPN and validate result correctness.",
+            "Step 2: Publish a controlled NRT event, then query Raw from a downstream consumer perspective to confirm the record is available within 60 seconds.",
+            "Step 3: Validate access denial for unauthorized downstream identities."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Functional Requirements > Downstream Data Availability; Assumptions > Downstream Access"
+    },
+    {
+        "plan_id": "TP-011",
+        "section_name": "Maintainability, Extensibility & Configuration-Driven Onboarding",
+        "description": "Validates that the ingestion framework supports onboarding new Moogsoft tables and modifying ingestion patterns (schedules, watermark logic, mappings) through configuration changes with minimal code modification, in line with the BRD's modularity and extensibility commitments.",
+        "preconditions": "Configuration-driven framework deployed; sample new-dataset onboarding spec available; documentation for configuration schema published.",
+        "Expected Result": "A new sample Moogsoft dataset can be onboarded end-to-end via configuration changes only, with no core code modification, and existing pipelines continue to operate unaffected.",
+        "image_ref": "no",
+        "priority": "Medium",
+        "type": "Functional Validation",
+        "steps": [
+            "Step 1: Onboard a synthetic test table by editing only configuration files (Windows-style backslash paths preserved) and verify ingestion succeeds.",
+            "Step 2: Modify the schedule and watermark column of an existing pipeline via configuration and confirm behavior changes accordingly.",
+            "Step 3: Regression-test in-scope pipelines to confirm no unintended side effects."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Functional Requirements > Extensibility & Maintainability; NFR > Maintainability & Extensibility"
+    },
+    {
+        "plan_id": "TP-012",
+        "section_name": "Entry Criteria & Test Phase Readiness Gate",
+        "description": "Defines the numeric and qualitative gates required to formally open the QA execution phase for the Moogsoft-to-EDL ingestion program. Entry is contingent on environment readiness, source/target provisioning, security artifacts, test data availability, and stakeholder sign-off on requirements and architecture.",
+        "preconditions": "BRD v4.1.3 baselined; environment provisioning complete per TP-002; SPNs provisioned; test data and watermark columns provided by Moogsoft source team.",
+        "Expected Result": "Signed Entry Criteria Checklist authorizing start of QA execution, with \u226595% of unit-test pass rate from Dev handoff, 100% of critical infrastructure ready, and all blocking defects from prior phases resolved.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Operational Governance",
+        "steps": [
+            "Step 1: Verify BRD sign-off, architecture review approval, and dev unit-test pass rate \u226595%.",
+            "Step 2: Confirm DEV/QA/PROD environment readiness per TP-002 including SQL endpoints, Event Hub topic, SPNs, and EDL Landing/Raw provisioning.",
+            "Step 3: Confirm watermark columns, schema mappings, and Source Data Availability dates from BRD Appendix are documented and validated.",
+            "Step 4: Obtain formal entry sign-off from QA Lead, Lead Data Engineer (Avinash Repe), and Senior Solution Architect (Sahil Nagpal)."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Assumptions; Appendix"
+    },
+    {
+        "plan_id": "TP-013",
+        "section_name": "Suspension Criteria & Resumption Triggers",
+        "description": "Defines the conditions under which QA execution must be paused and the criteria for resumption. Triggers include: source SQL Server unavailability, Event Hub outage, SPN credential failure, critical schema drift in source, sustained NRT latency breach (>60s) beyond agreed tolerance, environment instability affecting >25% of test runs, or detection of any PII/PHI in ingested data.",
+        "preconditions": "Suspension policy reviewed with stakeholders; communication tree established; escalation matrix published.",
+        "Expected Result": "Clear, pre-approved suspension and resumption playbook in effect; any trigger event leads to documented pause, root-cause analysis, remediation, and a formal resumption authorization.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Operational Governance",
+        "steps": [
+            "Step 1: Monitor for suspension triggers (source/Event Hub outage, SPN failure, schema drift, PII detection, environment instability >25% failure).",
+            "Step 2: On trigger, pause test execution and notify Business Analyst, QA Lead, and Architecture stakeholders.",
+            "Step 3: Execute RCA and remediation; re-validate environment and re-run impacted tests.",
+            "Step 4: Obtain formal resumption sign-off before resuming the cadence."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Constraints; NFR > Availability & Reliability"
+    },
+    {
+        "plan_id": "TP-014",
+        "section_name": "Exit Criteria & Production Sign-Off Gate",
+        "description": "Defines pass/fail thresholds to close the QA cycle and authorize production deployment. Exit requires: 100% of High-priority test cases executed with 100% pass; \u226598% pass for Medium-priority; zero open Severity-1 or Severity-2 defects; verified NRT latency \u226460s at p95 over 24-hour soak; successful full historical backfill reconciliation; zero PII/PHI findings; complete observability/alerting validated; and signed Production Readiness artifacts.",
+        "preconditions": "All test phases (TP-003 through TP-011) executed; defect triage complete; performance soak completed.",
+        "Expected Result": "Signed Exit Criteria document with full traceability of test results to BRD requirements; Go/No-Go decision approved by Product, Architecture, Engineering, and QA leadership.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Operational Governance",
+        "steps": [
+            "Step 1: Compile test execution metrics and defect status against pre-defined exit thresholds.",
+            "Step 2: Confirm NRT p95 latency \u226460s over a 24-hour soak and successful backfill reconciliation.",
+            "Step 3: Confirm zero open Sev-1/Sev-2 defects and zero PII/PHI findings.",
+            "Step 4: Obtain Go-Live sign-off from Director Platform Engineering (Jason Andrews), Lead Data Engineer (Avinash Repe), Senior Solution Architect (Sahil Nagpal), and QA Lead."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Functional & Non-Functional Requirements (all sections)"
+    },
+    {
+        "plan_id": "TP-015",
+        "section_name": "Test Tooling, Resource Planning & Stakeholder Responsibility Matrix",
+        "description": "Defines the QA tooling stack and a RACI-style matrix aligning responsibilities across stakeholders identified in the BRD. Tooling includes Azure Data Factory / Databricks for pipeline inspection, Azure SQL clients for source validation, Event Hub producers/consumers for NRT injection, Power BI client for downstream validation, log analytics / monitoring dashboards for observability, secret/PII scanners for compliance, and a test management/defect tool for traceability. Responsibility assignments: Business Analyst Nanda Kishore Gowravaram (requirement clarification), Senior Solution Architects Sahil Nagpal and Jeffrey Hua (architecture validation), Principal Enterprise Integration Architect Sandeep Singh (integration guidance), Data Engineers David Eulid Hernandez Cardenas and Mohammad Arham Khan Khokar (pipeline fixes), Director/Lead Data Engineer Avinash Repe (engineering accountability), Platform Reliability Engineers Kyle Moyer and Ashkan Mohseni (environment, monitoring, reliability), Director Platform Engineering Jason Andrews (executive approval), and QA Lead (test execution, defect triage, sign-off).",
+        "preconditions": "Tooling licenses provisioned; stakeholders confirmed available; RACI reviewed and accepted.",
+        "Expected Result": "A signed RACI matrix and tooling roster published in the project workspace, with every test plan section (TP-001 through TP-016) mapped to a Responsible and Accountable owner.",
+        "image_ref": "yes",
+        "priority": "High",
+        "type": "Operational Governance",
+        "steps": [
+            "Step 1: Finalize the tooling list and confirm access provisioning for each QA team member.",
+            "Step 2: Map each plan section (TP-001..TP-016) to Responsible/Accountable/Consulted/Informed roles drawn from the BRD stakeholder roster.",
+            "Step 3: Circulate the RACI for sign-off and publish in the project workspace alongside the BRD Architecture Diagram for reference.",
+            "Step 4: Schedule recurring governance checkpoints with Business, Architecture, Engineering, and QA leads through the test cycle."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Key Stakeholders; Approval Stakeholders"
+    },
+    {
+        "plan_id": "TP-016",
+        "section_name": "Open Risks & Strategy Questions",
+        "description": "Captures structurally unclear or unresolved areas from the BRD that require explicit QA leadership attention prior to execution. Open items include: (a) PROD Event Hub connection details are placeholders in the BRD ('Prod:' section is empty) and must be supplied; (b) DEV and PROD table-name lists in the Appendix are empty and need confirmation; (c) the exact <YYYYMMDD> backfill cutoff date is not finalized; (d) the QA-environment SPN is named but the PROD SPN is unstated; (e) Approval Stakeholders, Document Revision History, Related Documents, Approval Date, Attachments, and Glossary tables in the BRD are referenced but empty in the source content; (f) no explicit SLA for batch operational window beyond 'starts at 9 AM EST'; (g) downstream consumer list beyond Power BI is not enumerated.",
+        "preconditions": "BRD v4.1.3 reviewed; open items logged in the project risk register.",
+        "Expected Result": "Each open item is owned, dated, and tracked to closure prior to Exit Criteria sign-off (TP-014); any item remaining open at exit must be formally accepted as residual risk by the Director Platform Engineering.",
+        "image_ref": "no",
+        "priority": "High",
+        "type": "Operational Governance",
+        "steps": [
+            "Step 1: Log each open item in the risk register with owner, severity, and target resolution date.",
+            "Step 2: Solicit clarifications from the Business Analyst and Architecture team for missing connection details, table names, cutoff date, and PROD SPN.",
+            "Step 3: Update the BRD and re-baseline test artifacts as clarifications arrive.",
+            "Step 4: Re-assess residual risk at the Exit Criteria gate and obtain formal acceptance for anything still open."
+        ],
+        "requirement_mapping": "BRD v4.1.3 - Appendix > Source Connection Details (Prod / Table names); Approval Stakeholders; Document Revision History"
+    }
+]
